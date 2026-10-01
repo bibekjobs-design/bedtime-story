@@ -2,3 +2,175 @@ Bedtime Story git setup
 C:\Program Files\Git\cmd\git.exe
 Access is denied.
 fatal: pathspec '.' did not match any files
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/.env.example', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/auth.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/config.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/db.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/main.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/routers/admin.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/routers/announcements.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/routers/auth.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/routers/history.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/routers/lookups.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/routers/profiles.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/routers/stories.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/routers/subscriptions.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/routers/voice_clones.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/category_image_service.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/cost_constants.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/email_service.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/history_service.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/personalization_service.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/story_service.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/subscription_policy.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/tts_service.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/tts_usage_service.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/usage_service.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/voice_clone_service.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/backfill_library.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/clean_images.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/list_db_categories.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/migrations/002_performance_indexes.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/migrations/003_story_ratings.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/requirements.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/seed_all_library_stories.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/sql/001_story_events.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/sql/002_tts_usage_monthly.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/sql/003_db_storage_stats_function.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/sql/004_category_images.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/sql/005_manual_story_extras.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/sql/006_announcements.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/sql/007_autopay.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/widen_age_group_3.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/AGENTS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/App.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/CLAUDE.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/LICENSE', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/app.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/eas.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/index.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/package-lock.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/package.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/api/authStorage.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/api/client.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/api/config.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/components/NotificationBell.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/components/ParentalGateModal.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/components/StarryBackground.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/components/StoryLoadingOverlay.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/components/SubscriptionModal.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/components/VoiceRecorderModal.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/AdminDashboardScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/AgeGroupScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/CategoryScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/CategoryStoriesScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/CreateScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/ForgotPasswordScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/HistoryScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/LibraryScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/LoginScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/PlayerScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/ProfilesScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/RegisterScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/ResetPasswordScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/StoryPickerScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/theme/colors.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/utils/safeAudio.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'run_expo_web.bat', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'setup_git.bat', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'setup_git_log.txt', LF will be replaced by CRLF the next time Git touches it
+---- FILES TO BE SAVED ---- 
+.gitignore
+backend/.env.example
+backend/app/__init__.py
+backend/app/auth.py
+backend/app/config.py
+backend/app/db.py
+backend/app/main.py
+backend/app/routers/admin.py
+backend/app/routers/announcements.py
+backend/app/routers/auth.py
+backend/app/routers/history.py
+backend/app/routers/lookups.py
+backend/app/routers/profiles.py
+backend/app/routers/stories.py
+backend/app/routers/subscriptions.py
+backend/app/routers/voice_clones.py
+backend/app/services/category_image_service.py
+backend/app/services/cost_constants.py
+backend/app/services/email_service.py
+backend/app/services/history_service.py
+backend/app/services/personalization_service.py
+backend/app/services/story_service.py
+backend/app/services/subscription_policy.py
+backend/app/services/tts_service.py
+backend/app/services/tts_usage_service.py
+backend/app/services/usage_service.py
+backend/app/services/voice_clone_service.py
+backend/backfill_library.py
+backend/clean_images.py
+backend/list_db_categories.py
+backend/migrations/002_performance_indexes.sql
+backend/migrations/003_story_ratings.sql
+backend/requirements.txt
+backend/seed_all_library_stories.py
+backend/sql/001_story_events.sql
+backend/sql/002_tts_usage_monthly.sql
+backend/sql/003_db_storage_stats_function.sql
+backend/sql/004_category_images.sql
+backend/sql/005_manual_story_extras.sql
+backend/sql/006_announcements.sql
+backend/sql/007_autopay.sql
+backend/widen_age_group_3.py
+mobile/.gitignore
+mobile/AGENTS.md
+mobile/App.js
+mobile/CLAUDE.md
+mobile/LICENSE
+mobile/app.json
+mobile/assets/android-icon-background.png
+mobile/assets/android-icon-foreground.png
+mobile/assets/android-icon-monochrome.png
+mobile/assets/favicon.png
+mobile/assets/icon.png
+mobile/assets/images/app_bg_stars.jpg
+mobile/assets/images/fox.jpg
+mobile/assets/images/moon.jpg
+mobile/assets/splash-icon.png
+mobile/eas.json
+mobile/index.js
+mobile/package-lock.json
+mobile/package.json
+mobile/src/api/authStorage.js
+mobile/src/api/client.js
+mobile/src/api/config.js
+mobile/src/components/NotificationBell.js
+mobile/src/components/ParentalGateModal.js
+mobile/src/components/StarryBackground.js
+mobile/src/components/StoryLoadingOverlay.js
+mobile/src/components/SubscriptionModal.js
+mobile/src/components/VoiceRecorderModal.js
+mobile/src/screens/AdminDashboardScreen.js
+mobile/src/screens/AgeGroupScreen.js
+mobile/src/screens/CategoryScreen.js
+mobile/src/screens/CategoryStoriesScreen.js
+mobile/src/screens/CreateScreen.js
+mobile/src/screens/ForgotPasswordScreen.js
+mobile/src/screens/HistoryScreen.js
+mobile/src/screens/LibraryScreen.js
+mobile/src/screens/LoginScreen.js
+mobile/src/screens/PlayerScreen.js
+mobile/src/screens/ProfilesScreen.js
+mobile/src/screens/RegisterScreen.js
+mobile/src/screens/ResetPasswordScreen.js
+mobile/src/screens/StoryPickerScreen.js
+mobile/src/theme/colors.js
+mobile/src/utils/safeAudio.js
+run_expo_web.bat
+setup_git.bat
+setup_git_log.txt
+f7145f2 Bedtime Story app - initial commit
+RESULT: DONE 

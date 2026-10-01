@@ -1,0 +1,4 @@
+Bedtime Story git setup 
+C:\Program Files\Git\cmd\git.exe
+Access is denied.
+fatal: pathspec '.' did not match any files

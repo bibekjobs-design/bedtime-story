@@ -1,0 +1,54 @@
+# ---- Secrets: NEVER commit ----
+.env
+.env.*
+!.env.example
+*.env
+env.txt
+backend/google-tts.json
+*service-account*.json
+*.pem
+*.key
+*.jks
+
+# ---- Dependencies / build output ----
+node_modules/
+venv/
+.venv/
+env/
+.expo/
+dist/
+web-build/
+android/
+ios/
+__pycache__/
+*.py[cod]
+
+# ---- Editor / OS / other-tool folders ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/
+.codex/
+.gemini/
+.git_old_expo_template/
+
+# ---- Local scratch files (not part of the app) ----
+Claude outputs/
+preview_player.html
+prompt.txt
+Success. No rows returned.txt
+backend/check_*.py
+backend/diag_*.py
+backend/scratch_*.py
+backend/run_*.bat
+backend/test_*.py
+backend/install_razorpay.bat
+mobile/func*.py
+mobile/step*.py
+mobile/fix_*.py
+mobile/assemble.py
+mobile/clean.py
+mobile/imports.py
+mobile/rewrite_search.py
+mobile/ambient.txt

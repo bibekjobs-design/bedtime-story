@@ -395,7 +395,7 @@ export const api = {
 
   // Subscriptions & Razorpay Payments (real Orders API + signature verification)
   getSubscriptionStatus: () => request("/api/subscriptions/status"),
-  createSubscriptionOrder: (planId = "pro_monthly") =>
+  createSubscriptionOrder: (planId = "pro151_monthly") =>
     request("/api/subscriptions/create-order", {
       method: "POST",
       body: JSON.stringify({ plan_id: planId }),
@@ -407,7 +407,7 @@ export const api = {
     }),
 
   // Auto-renew (Razorpay Subscriptions): monthly mandate instead of a one-time order
-  createAutopaySubscription: (planId = "pro_monthly") =>
+  createAutopaySubscription: (planId = "pro151_monthly") =>
     request("/api/subscriptions/create-autopay", {
       method: "POST",
       body: JSON.stringify({ plan_id: planId }),

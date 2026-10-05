@@ -329,7 +329,8 @@ export default function ProfilesScreen({
     user?.subscription_tier
   );
   const isNormal = user?.subscription_tier === "normal_monthly";
-  const isPaid = isPremium || isNormal;
+  const isProPlan = user?.subscription_tier === "pro_monthly"; // Rs 151
+  const isPaid = isPremium || isNormal || isProPlan;
 
   return (
     <View style={styles.container}>
@@ -386,35 +387,66 @@ export default function ProfilesScreen({
           {!isPremium && (
             <View style={styles.upgradeCard}>
               <View style={styles.upgradeCardHeader}>
-                <Text style={styles.upgradeEmoji}>👑</Text>
+                <Text style={styles.upgradeEmoji}>{isProPlan ? "👑" : "✨"}</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.upgradeTitle}>
-                    {isNormal ? "Unlock parent voice cloning" : "Give your kids the full magic"}
+                    {isProPlan
+                      ? "Unlock parent voice cloning"
+                      : isNormal
+                      ? "Unlock story creation"
+                      : "Give your kids the full magic"}
                   </Text>
                   <Text style={styles.upgradeSubtitle}>
-                    Bedtime Story Pro · <Text style={styles.upgradePrice}>₹219</Text>/month{" "}
-                    <Text style={styles.upgradeStrikePrice}>₹299</Text>
+                    {isProPlan ? (
+                      <>
+                        Bedtime Story Super · <Text style={styles.upgradePrice}>₹219</Text>/month{" "}
+                        <Text style={styles.upgradeStrikePrice}>₹299</Text>
+                      </>
+                    ) : (
+                      <>
+                        Bedtime Story Pro · <Text style={styles.upgradePrice}>₹151</Text>/month
+                      </>
+                    )}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.upgradeBenefits}>
-                <View style={styles.upgradeBenefitRow}>
-                  <Text style={styles.upgradeBenefitIcon}>🎙️</Text>
-                  <Text style={styles.upgradeBenefitText}>
-                    Narrate stories in <Text style={styles.boldInline}>your own voice</Text> — Mom or Dad, cloned (4/month)
-                  </Text>
-                </View>
+                {isProPlan ? (
+                  <>
+                    <View style={styles.upgradeBenefitRow}>
+                      <Text style={styles.upgradeBenefitIcon}>🎙️</Text>
+                      <Text style={styles.upgradeBenefitText}>
+                        Narrate stories in <Text style={styles.boldInline}>your own voice</Text> — Mom or Dad, cloned (4/month)
+                      </Text>
+                    </View>
+                    <View style={styles.upgradeBenefitRow}>
+                      <Text style={styles.upgradeBenefitIcon}>✨</Text>
+                      <Text style={styles.upgradeBenefitText}>
+                        8 AI story generations every month, up to 5 minutes each
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.upgradeBenefitRow}>
+                      <Text style={styles.upgradeBenefitIcon}>✨</Text>
+                      <Text style={styles.upgradeBenefitText}>
+                        <Text style={styles.boldInline}>5 AI-narrated stories</Text> every month, voiced by Luna & friends
+                      </Text>
+                    </View>
+                    <View style={styles.upgradeBenefitRow}>
+                      <Text style={styles.upgradeBenefitIcon}>🎙️</Text>
+                      <Text style={styles.upgradeBenefitText}>
+                        Want Mom or Dad's own cloned voice? That's in Super (₹219/month)
+                      </Text>
+                    </View>
+                  </>
+                )}
                 <View style={styles.upgradeBenefitRow}>
                   <Text style={styles.upgradeBenefitIcon}>🧸</Text>
                   <Text style={styles.upgradeBenefitText}>
                     <Text style={styles.boldInline}>Unlimited child profiles</Text> — one for every kid, not just one
-                  </Text>
-                </View>
-                <View style={styles.upgradeBenefitRow}>
-                  <Text style={styles.upgradeBenefitIcon}>✨</Text>
-                  <Text style={styles.upgradeBenefitText}>
-                    Up to 15 AI story generations every month, no waiting on limits
                   </Text>
                 </View>
                 <View style={styles.upgradeBenefitRow}>
@@ -427,7 +459,11 @@ export default function ProfilesScreen({
 
               <TouchableOpacity style={styles.upgradeCta} onPress={onGoToUpgrade}>
                 <Text style={styles.upgradeCtaText}>
-                  {isNormal ? "Upgrade to Pro — ₹219/month" : "View Plans — from ₹99/month"}
+                  {isProPlan
+                    ? "Upgrade to Super — ₹219/month"
+                    : isNormal
+                    ? "Upgrade to Pro — ₹151/month"
+                    : "View Plans — from ₹99/month"}
                 </Text>
               </TouchableOpacity>
               <Text style={styles.upgradeFooterNote}>Cancel anytime. No hidden charges.</Text>
@@ -523,7 +559,7 @@ export default function ProfilesScreen({
             <Text style={styles.emptySubtitle}>
               {isPremium
                 ? "Clone your voice so bedtime stories can be narrated in Mom or Dad's comforting voice."
-                : "Clone your voice so bedtime stories can be narrated in Mom or Dad's comforting voice. This is a Pro feature (₹219/month)."}
+                : "Clone your voice so bedtime stories can be narrated in Mom or Dad's comforting voice. This is a Super feature (₹219/month)."}
             </Text>
             <TouchableOpacity
               style={styles.addFirstBtn}

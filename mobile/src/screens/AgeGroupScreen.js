@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Image,
+  useWindowDimensions,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { colors } from "../theme/colors";
 import { api } from "../api/client";
-import NotificationBell from "../components/NotificationBell";
 
 export default function AgeGroupScreen({
   currentUser,
@@ -23,6 +24,25 @@ export default function AgeGroupScreen({
   onOpenAdmin,
   onNotificationAction,
 }) {
+  const { width: W, height: H } = useWindowDimensions();
+  // Deterministic star dust inside the band (same every render)
+  const dust = useMemo(() => {
+    let seed = 7;
+    const rnd = () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+    const out = [];
+    for (let i = 0; i < 70; i++) {
+      const x = rnd();
+      const y = rnd() * 0.97;
+      out.push({ x, y, s: rnd() < 0.12 ? 3.2 : rnd() < 0.4 ? 2.2 : 1.5, o: (0.55 + rnd() * 0.45).toFixed(2) });
+    }
+    return out;
+  }, []);
+
+  // Hero picture: a random cover from the story library (stored in the database)
+  const [heroUri, setHeroUri] = useState(null);
   const isPremium = ["premium", "premium_monthly", "premium_annual", "admin_vip"].includes(
     currentUser?.subscription_tier
   );
@@ -72,22 +92,56 @@ export default function AgeGroupScreen({
   const kidProfiles = profiles.filter((p) => (p.age_group_id === 2 || (p.age && p.age >= 5)));
 
   useEffect(() => {
-    // Silently prefetch & cache library stories for 0ms transition
-    api.getPrecreatedStories(null, 1, 1, "popular").then((data) => {
-      if (data && data.length > 0) {
-        AsyncStorage.setItem("@bedtime_precreated_cache_1_all_popular", JSON.stringify(data)).catch(() => {});
-      }
-    }).catch(() => {});
-    api.getPrecreatedStories(null, 2, 1, "popular").then((data) => {
-      if (data && data.length > 0) {
-        AsyncStorage.setItem("@bedtime_precreated_cache_2_all_popular", JSON.stringify(data)).catch(() => {});
-      }
-    }).catch(() => {});
-    api.getPrecreatedStories(null, 3, 1, "popular").then((data) => {
-      if (data && data.length > 0) {
-        AsyncStorage.setItem("@bedtime_precreated_cache_3_all_popular", JSON.stringify(data)).catch(() => {});
-      }
-    }).catch(() => {});
+    let cancelled = false;
+    const keyFor = (g) => "@bedtime_precreated_cache_" + g + "_all_popular";
+    const pickRandomCover = (lists) => {
+      const covers = [];
+      lists.forEach((list) => {
+        (Array.isArray(list) ? list : []).forEach((s) => {
+          if (s && typeof s.cover_image_url === "string" && s.cover_image_url.startsWith("http")) {
+            covers.push(s.cover_image_url);
+          }
+        });
+      });
+      if (covers.length === 0) return null;
+      return covers[Math.floor(Math.random() * covers.length)];
+    };
+
+    // 1) Instantly use the cached library (if any) so the picture shows at once
+    Promise.all(
+      [1, 2, 3].map((g) =>
+        AsyncStorage.getItem(keyFor(g))
+          .then((raw) => (raw ? JSON.parse(raw) : []))
+          .catch(() => [])
+      )
+    ).then((lists) => {
+      if (cancelled) return;
+      const pick = pickRandomCover(lists);
+      if (pick) setHeroUri((cur) => cur || pick);
+    });
+
+    // 2) Fetch fresh library, refresh the cache (0ms transitions) and pick a cover
+    Promise.all(
+      [1, 2, 3].map((g) =>
+        api
+          .getPrecreatedStories(null, g, 1, "popular")
+          .then((data) => {
+            if (data && data.length > 0) {
+              AsyncStorage.setItem(keyFor(g), JSON.stringify(data)).catch(() => {});
+            }
+            return data || [];
+          })
+          .catch(() => [])
+      )
+    ).then((lists) => {
+      if (cancelled) return;
+      const pick = pickRandomCover(lists);
+      if (pick) setHeroUri((cur) => cur || pick);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -121,30 +175,187 @@ export default function AgeGroupScreen({
     }
   };
 
+  const TILE_COLORS = [
+    ["#ff6b6b", "#e63946"],
+    ["#6a7bff", "#3b4bd6"],
+    ["#f5a623", "#f08c00"],
+    ["#34c9a1", "#1f9e7e"],
+  ];
+
+  const hasProfiles = profiles.length > 0;
+
   return (
     <View style={styles.container}>
-      {/* Top-right: Admin (admins only) + notifications bell + Log Out */}
-      <View style={styles.topRow}>
-        {currentUser?.is_admin ? (
+      {/* Night-sky background (full screen): sky, moon, hills */}
+      <View style={styles.sky} pointerEvents="none" />
+
+      {/* Hero story picture (random cover from the library) fading into black */}
+      {heroUri ? (
+        <View style={[styles.hero, { height: H * 0.64 }]} pointerEvents="none">
+          <Image
+            source={{ uri: heroUri }}
+            style={styles.heroImage}
+            resizeMode="cover"
+            onError={() => setHeroUri(null)}
+          />
+          {Array.from({ length: 28 }).map((_, i) => (
+            <View
+              key={"f" + i}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: (H * 0.64 * (27 - i)) / 56,
+                height: (H * 0.64) / 56 + 1,
+                backgroundColor: "rgba(5, 6, 12, " + Math.min(1, (i / 27) * 1.05).toFixed(3) + ")",
+              }}
+            />
+          ))}
+          {Array.from({ length: 6 }).map((_, i) => (
+            <View
+              key={"t" + i}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: i * 12,
+                height: 13,
+                backgroundColor: "rgba(5, 6, 12, " + (0.5 - i * 0.08).toFixed(2) + ")",
+              }}
+            />
+          ))}
+        </View>
+      ) : null}
+      {/* Small white stars scattered across the sky */}
+      {!heroUri ? (
+      <View pointerEvents="none" style={styles.starField}>
+        {dust.map((d, i) => (
+          <View
+            key={"d" + i}
+            style={{
+              position: "absolute",
+              left: d.x * 100 + "%",
+              top: d.y * 100 + "%",
+              width: d.s,
+              height: d.s,
+              borderRadius: d.s,
+              backgroundColor: "rgba(255,255,255," + d.o + ")",
+            }}
+          />
+        ))}
+      </View>
+      ) : null}
+      {STARS.map((s, i) => (
+        <Text
+          key={i}
+          pointerEvents="none"
+          style={[styles.star, { top: s.top, left: s.left, fontSize: s.size, color: s.color }]}
+        >
+          {s.ch}
+        </Text>
+      ))}
+      {!heroUri ? <View style={styles.hillBack} pointerEvents="none" /> : null}
+      {!heroUri ? <View style={styles.hillFront} pointerEvents="none" /> : null}
+
+      {/* Top-left: S logo (like the N on Netflix) */}
+      <View style={styles.logoWrap}>
+        <View style={styles.logoBadge}>
+          <Text style={styles.logoS}>S</Text>
+        </View>
+      </View>
+
+      {/* Top-right: Admin link (admins only). Bell and Log Out live inside the child profile. */}
+      {currentUser?.is_admin ? (
+        <View style={styles.topRow}>
           <TouchableOpacity style={styles.chip} onPress={onOpenAdmin} activeOpacity={0.8}>
             <Text style={styles.chipTextGold}>📊 Admin</Text>
           </TouchableOpacity>
-        ) : null}
-        <NotificationBell userKey={currentUser?.id || "guest"} onAction={onNotificationAction} />
-        {currentUser ? (
-          <TouchableOpacity style={styles.chip} onPress={onLogout} activeOpacity={0.8}>
-            <Text style={styles.chipText}>🚪 Log Out</Text>
+        </View>
+      ) : null}
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.ask}>Who's listening tonight?</Text>
+
+        {/* Profile tiles */}
+        <View style={styles.tiles}>
+          {hasProfiles ? (
+            profiles.map((profile, idx) => {
+              const isToddler = profile.age_group_id === 1 || (profile.age && profile.age <= 4);
+              const emoji = isToddler ? "🦊" : "🦉";
+              const isActive = localActiveProfile?.id === profile.id;
+              const [c1] = TILE_COLORS[idx % TILE_COLORS.length];
+              return (
+                <TouchableOpacity
+                  key={profile.id}
+                  style={styles.tile}
+                  activeOpacity={0.85}
+                  onPress={() => beginWithProfile(profile)}
+                >
+                  <View style={[styles.face, { backgroundColor: c1 }, isActive && styles.faceActive]}>
+                    <Text style={styles.faceEmoji}>{emoji}</Text>
+                  </View>
+                  <Text style={styles.tileName} numberOfLines={1}>{profile.name}</Text>
+                  <Text style={styles.tileAge}>Age {isToddler ? "3-5" : "6-8"}</Text>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <>
+              {/* No profiles yet: the two default age groups */}
+              <TouchableOpacity style={styles.tile} activeOpacity={0.85} onPress={() => beginWithProfile(null)}>
+                <View style={[styles.face, { backgroundColor: TILE_COLORS[0][0] }]}>
+                  <Text style={styles.faceEmoji}>🦊</Text>
+                </View>
+                <Text style={styles.tileName}>Toddlers</Text>
+                <Text style={styles.tileAge}>Age 2-4</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.tile} activeOpacity={0.85} onPress={() => beginWithProfile(null)}>
+                <View style={[styles.face, { backgroundColor: TILE_COLORS[1][0] }]}>
+                  <Text style={styles.faceEmoji}>🦉</Text>
+                </View>
+                <Text style={styles.tileName}>Kids</Text>
+                <Text style={styles.tileAge}>Age 5+</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* Add (logged-in: add a profile, guest: log in) */}
+          <TouchableOpacity
+            style={styles.tile}
+            activeOpacity={0.85}
+            onPress={currentUser ? onOpenProfiles : onOpenLogin}
+          >
+            <View style={[styles.face, styles.faceMuted]}>
+              <Text style={styles.faceSymbol}>+</Text>
+            </View>
+            <Text style={styles.tileName}>Add</Text>
           </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.loginPill} onPress={onOpenLogin} activeOpacity={0.8}>
-            <Text style={styles.loginPillText}>🔑 Parent Login</Text>
+
+          {/* Edit = Manage Profiles */}
+          {currentUser ? (
+            <TouchableOpacity style={styles.tile} activeOpacity={0.85} onPress={onOpenProfiles}>
+              <View style={[styles.face, styles.faceMuted]}>
+                <Text style={styles.faceEmoji}>✏️</Text>
+              </View>
+              <Text style={styles.tileName}>Edit</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* Upgrade to Pro - free accounts only */}
+        {currentUser && !isPremium && (
+          <TouchableOpacity style={styles.upgradeBtn} activeOpacity={0.85} onPress={onGoToUpgrade}>
+            <Text style={styles.upgradeBtnText}>
+              {currentUser?.subscription_tier === "pro_monthly" ? "👑 Upgrade to Super" : "👑 Upgrade to Pro"}
+            </Text>
           </TouchableOpacity>
         )}
-      </View>
 
-      <View style={styles.header}>
-        <Text style={styles.titleSerif}>Dream Weaver</Text>
-        <Text style={styles.subtitle}>Who is listening tonight?</Text>
+        {/* Free-days line sits under the Upgrade button */}
         {currentUser && trialText ? (
           <TouchableOpacity activeOpacity={0.85} onPress={onGoToUpgrade}>
             <Text
@@ -157,97 +368,93 @@ export default function AgeGroupScreen({
             </Text>
           </TouchableOpacity>
         ) : null}
-      </View>
 
-      <ScrollView style={styles.profilesScroll} contentContainerStyle={styles.profilesGrid} horizontal={false}>
-        <View style={styles.bubblesRow}>
-          {profiles.length > 0 ? (
-            profiles.map((profile) => {
-              const isToddler = profile.age_group_id === 1 || (profile.age && profile.age <= 4);
-              const emoji = isToddler ? "🦊" : "🦉";
-              const isActive = localActiveProfile?.id === profile.id;
-
-              return (
-                <TouchableOpacity
-                  key={profile.id}
-                  style={[styles.profileBubble, isActive && styles.profileBubbleActive]}
-                  activeOpacity={0.8}
-                  onPress={() => beginWithProfile(profile)}
-                >
-                  <View style={[styles.avatar, isActive && styles.avatarActive]}>
-                    <Text style={styles.avatarEmoji}>{emoji}</Text>
-                  </View>
-                  <Text style={styles.profileName}>{profile.name}</Text>
-                  <View style={styles.ageBadge}>
-                    <Text style={styles.ageBadgeText}>Age {isToddler ? "3-5" : "6-8"}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          ) : (
-            <>
-              {/* Fallback age groups if there are no profiles yet */}
-              <TouchableOpacity
-                style={[styles.profileBubble, !localActiveProfile && styles.profileBubbleActive]}
-                activeOpacity={0.8}
-                onPress={() => beginWithProfile(null)}
-              >
-                <View style={[styles.avatar, !localActiveProfile && styles.avatarActive]}>
-                  <Text style={styles.avatarEmoji}>🦊</Text>
-                </View>
-                <Text style={styles.profileName}>Toddlers</Text>
-                <View style={styles.ageBadge}>
-                  <Text style={styles.ageBadgeText}>Age 2-4</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.profileBubble} activeOpacity={0.8} onPress={() => beginWithProfile(null)}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarEmoji}>✨</Text>
-                </View>
-                <Text style={styles.profileName}>Kids</Text>
-                <View style={styles.ageBadge}>
-                  <Text style={styles.ageBadgeText}>Age 5+</Text>
-                </View>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-
-        {/* Upgrade to Pro - free accounts only */}
-        {currentUser && !isPremium && (
-          <TouchableOpacity style={[styles.btn, styles.btnPro]} activeOpacity={0.85} onPress={onGoToUpgrade}>
-            <Text style={[styles.btnText, styles.btnProText]}>👑 Upgrade to Pro</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Manage / Add Profiles */}
-        <TouchableOpacity
-          style={[styles.btn, styles.btnManage]}
-          activeOpacity={0.85}
-          onPress={currentUser ? onOpenProfiles : onOpenLogin}
-        >
-          <Text style={styles.btnText}>
-            {currentUser ? "⚙️ Manage Profiles" : "🔑 Parent Login to Personalize"}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Keeps the buttons clear of the bottom nav bar */}
+        {/* Bottom breathing room */}
         <View style={styles.bottomSpacer} />
       </ScrollView>
     </View>
   );
 }
 
-// Dark translucent fills + light text so everything stays readable on the
-// golden nebula background.
+// Night-sky Home: dark translucent fills + light text.
 const DARK_FILL = "rgba(8, 11, 28, 0.62)";
+
+// (removed the sparkle-shaped stars; the Milky Way dust provides the stars)
+const STARS = [];
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "transparent",
-    paddingHorizontal: 24,
+    backgroundColor: "#05060c",
+    paddingHorizontal: 20,
     paddingTop: 24,
+  },
+  sky: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "62%",
+    backgroundColor: "#05060c",
+  },
+  hero: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: "hidden",
+  },
+  heroImage: { width: "100%", height: "100%" },
+  starField: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "58%",
+  },
+  star: { position: "absolute" },
+  hillBack: {
+    position: "absolute",
+    bottom: -90,
+    right: -80,
+    width: 380,
+    height: 260,
+    borderRadius: 190,
+    backgroundColor: "#0a0b14",
+  },
+  hillFront: {
+    position: "absolute",
+    bottom: -120,
+    left: -90,
+    width: 520,
+    height: 260,
+    borderRadius: 260,
+    backgroundColor: "#07080f",
+  },
+  logoWrap: {
+    position: "absolute",
+    top: 14,
+    left: 18,
+    zIndex: 5,
+    alignItems: "flex-start",
+  },
+  logoBadge: {
+    width: 56,
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoS: {
+    fontSize: 44,
+    lineHeight: 52,
+    fontWeight: "900",
+    color: "#e50914",
+    fontFamily: "serif",
+    textShadowColor: "rgba(0,0,0,0.6)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   topRow: {
     flexDirection: "row",
@@ -255,6 +462,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     marginBottom: 2,
+    zIndex: 5,
   },
   chip: {
     backgroundColor: DARK_FILL,
@@ -271,109 +479,81 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   loginPillText: { color: "#fff", fontSize: 12, fontWeight: "700" },
-  header: {
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  titleSerif: {
-    fontSize: 36,
-    fontWeight: "700",
-    color: "#ffffff",
-    fontFamily: "serif",
-    marginBottom: 4,
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowRadius: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#d5d9ea",
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowRadius: 6,
-  },
+
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: "flex-end", alignItems: "center", paddingTop: 120, paddingBottom: 90 },
+
   trialText: {
-    marginTop: 12,
+    marginTop: 14,
+    alignSelf: "center",
     color: "#fff3d6",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "800",
-    textAlign: "center",
     backgroundColor: DARK_FILL,
     borderWidth: 1,
     borderColor: "rgba(245, 166, 35, 0.55)",
-    borderRadius: 18,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
+    borderRadius: 16,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
     overflow: "hidden",
   },
   trialTextExpired: {
     color: "#d5d9ea",
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600",
     borderColor: "rgba(255,255,255,0.18)",
   },
-  profilesScroll: { flex: 1 },
-  profilesGrid: {
-    alignItems: "center",
-    paddingTop: 26,
-    paddingBottom: 40,
+
+  ask: {
+    marginTop: 18,
+    marginBottom: 16,
+    fontSize: 18,
+    color: "#e6e8f2",
   },
-  bubblesRow: {
+
+  // ---- profile tiles ----
+  tiles: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    gap: 24,
-    marginBottom: 6,
+    gap: 16,
+    rowGap: 18,
   },
-  profileBubble: { alignItems: "center", opacity: 0.7 },
-  profileBubbleActive: { opacity: 1 },
-  avatar: {
-    width: 112,
-    height: 112,
-    borderRadius: 56,
-    backgroundColor: DARK_FILL,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.25)",
+  tile: { width: 92, alignItems: "center" },
+  face: {
+    width: 92,
+    height: 92,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  avatarActive: { borderColor: "#f5a623" },
-  avatarEmoji: { fontSize: 50 },
-  profileName: {
-    fontSize: 20,
+  faceActive: { borderWidth: 3, borderColor: "#ffffff" },
+  faceMuted: { backgroundColor: "rgba(255,255,255,0.16)" },
+  faceEmoji: { fontSize: 42 },
+  faceSymbol: { fontSize: 44, color: "#ffffff", fontWeight: "300", marginTop: -4 },
+  tileName: {
+    fontSize: 15,
     fontWeight: "700",
     color: "#ffffff",
-    marginBottom: 6,
     textShadowColor: "rgba(0,0,0,0.6)",
     textShadowRadius: 6,
+    maxWidth: 92,
   },
-  ageBadge: {
-    backgroundColor: DARK_FILL,
-    borderWidth: 1,
-    borderColor: "rgba(245, 166, 35, 0.55)",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  ageBadgeText: { color: "#ffe2a3", fontSize: 12, fontWeight: "700" },
-  btn: {
-    width: "72%",
+  tileAge: { fontSize: 11, fontWeight: "700", color: "#ffe2a3", marginTop: 2 },
+
+  upgradeBtn: {
+    marginTop: 24,
     height: 46,
+    paddingHorizontal: 30,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 23,
-    backgroundColor: DARK_FILL,
-    marginTop: 12,
-  },
-  btnPro: {
-    marginTop: 22,
+    backgroundColor: "rgba(8, 11, 28, 0.65)",
     borderWidth: 1.5,
     borderColor: "#f5a623",
   },
-  btnManage: {
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.3)",
-  },
-  btnText: { color: "#ffffff", fontSize: 15, fontWeight: "800" },
-  btnProText: { color: "#ffe2a3" },
-  bottomSpacer: { height: 96 },
+  upgradeBtnText: { color: "#ffe2a3", fontSize: 15, fontWeight: "800" },
+
+  bottomSpacer: { height: 24 },
 });

@@ -22,6 +22,33 @@ from app.services.story_service import (
 
 router = APIRouter(prefix="/api/stories", tags=["Stories"])
 
+
+def _creation_limit_message(effective_tier: str, used: int, limit: int) -> str:
+    """Friendly 403 text for 'you can't create (more) stories' per plan."""
+    if effective_tier in ("premium", "premium_monthly", "premium_annual"):
+        return f"Monthly limit reached ({used}/{limit} stories used on Super). Your quota will reset next month."
+    if effective_tier == "pro_monthly":
+        return (
+            f"Monthly limit reached ({used}/{limit} stories used on Pro). "
+            "Upgrade to Super (₹219/month) for 8 stories/month + parent voice cloning!"
+        )
+    if effective_tier == "normal_monthly":
+        return (
+            "Your Normal plan (₹99/month) is for listening to the Library. "
+            "Upgrade to Pro (₹151/month) to create 5 AI-narrated stories a month, "
+            "or Super (₹219/month) for 8 stories + parent voice cloning."
+        )
+    if effective_tier == "free_expired":
+        return (
+            "Your free trial has ended. Subscribe to Pro (₹151/month, 5 stories) or "
+            "Super (₹219/month, 8 stories + voice cloning) to keep creating new stories. "
+            "You can still enjoy the full Library for free anytime!"
+        )
+    return (
+        f"You have used your free trial story ({used}/{limit}). "
+        "Upgrade to Pro (₹151/month) or Super (₹219/month) to create more stories!"
+    )
+
 ADMIN_EMAILS = {"bibekjobs@gmail.com"}
 
 
@@ -165,7 +192,7 @@ def generate_custom_story_endpoint(
     """
     Tab 2: Generate New Story
     Creates an original 5-7 min bedtime story from a topic/prompt in chosen narrator voice.
-    Trial users get 5 free AI voice story generations. Premium users get 10.
+    Free trial: 1 story. Pro: 5/month. Super: 8/month. Normal: listen only.
     """
     from app.services.usage_service import get_monthly_usage, TIER_LIMITS
     from app.services.subscription_policy import is_trial_active
@@ -192,26 +219,10 @@ def generate_custom_story_endpoint(
         story_used = usage.get("new_story_generation", 0)
 
         if story_used >= story_limit:
-            if effective_tier in ("premium", "premium_monthly", "premium_annual"):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Monthly limit reached ({story_used}/{story_limit} stories used). Your quota will reset next month."
-                )
-            elif effective_tier == "normal_monthly":
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Monthly limit reached ({story_used}/{story_limit} stories used). Upgrade to Pro (₹219/month) for 8 stories/month + parent voice cloning!"
-                )
-            elif effective_tier == "free_expired":
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Your free trial has ended. Subscribe to Normal (₹99/month, 3 stories) or Pro (₹219/month, 8 stories + voice cloning) to keep creating new stories. You can still enjoy the full Library for free anytime!"
-                )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"You have used all {story_limit} free trial story generations. Upgrade to Normal (₹99/month) or Pro (₹219/month) for more stories + parent voice cloning!"
-                )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=_creation_limit_message(effective_tier, story_used, story_limit),
+            )
 
     try:
         result = generate_custom_story(
@@ -281,14 +292,9 @@ async def convert_to_story_endpoint(
         story_used = usage.get("new_story_generation", 0)
 
         if story_used >= story_limit:
-            if effective_tier == "free_expired":
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Your free trial has ended. Subscribe to Normal (₹99/month) or Pro (₹219/month) to keep creating new stories. The Library is still free to browse anytime!"
-                )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Monthly limit reached ({story_used}/{story_limit} stories used)."
+                detail=_creation_limit_message(effective_tier, story_used, story_limit),
             )
 
     file_bytes = None

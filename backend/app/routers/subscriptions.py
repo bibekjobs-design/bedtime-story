@@ -15,14 +15,22 @@ from app.config import settings
 from app.services.subscription_policy import (
     NORMAL_PLAN_PRICE_INR,
     PRO_PLAN_PRICE_INR,
-    PRO_PLAN_ORIGINAL_PRICE_INR,
+    SUPER_PLAN_PRICE_INR,
+    SUPER_PLAN_ORIGINAL_PRICE_INR,
     NORMAL_TIER_NAME,
     PRO_TIER_NAME,
+    SUPER_TIER_NAME,
+    PLAN_KEY_NORMAL,
+    PLAN_KEY_PRO,
+    PLAN_KEY_SUPER,
     PAID_DURATION_DAYS,
     PRO_TIERS,
+    SUPER_TIERS,
     PAID_TIERS,
     get_trial_info,
     plan_for_amount,
+    tier_for_plan_key,
+    plan_label_for_tier,
 )
 
 router = APIRouter(prefix="/api/subscriptions", tags=["Subscriptions & Payments"])
@@ -30,7 +38,7 @@ router = APIRouter(prefix="/api/subscriptions", tags=["Subscriptions & Payments"
 # Kept for backwards compatibility with any older client still reading these
 # names; new code should use the plan-specific constants from
 # subscription_policy instead.
-PLAN_PRICE_INR = PRO_PLAN_PRICE_INR
+PLAN_PRICE_INR = SUPER_PLAN_PRICE_INR
 PREMIUM_DURATION_DAYS = PAID_DURATION_DAYS
 
 ADMIN_EMAILS = {"bibekjobs@gmail.com"}
@@ -54,7 +62,7 @@ def get_razorpay_client() -> razorpay.Client:
 class SubscriptionStatusResponse(BaseModel):
     user_id: str
     subscription_tier: str
-    plan_tier: str = "free"  # "trial" | "free_expired" | "normal" | "pro" | "admin"
+    plan_tier: str = "free"  # "trial" | "free_expired" | "normal" | "pro" | "super" | "admin"
     is_subscribed: bool
     is_trial_active: bool
     trial_ends_at: Optional[str] = None
@@ -62,10 +70,12 @@ class SubscriptionStatusResponse(BaseModel):
     trial_days_left: int = 0
     trial_duration_days: int = 15
     plan_name: str = "Bedtime Story"
-    plan_price_inr: int = PRO_PLAN_PRICE_INR
+    plan_price_inr: int = SUPER_PLAN_PRICE_INR
     normal_plan_price_inr: int = NORMAL_PLAN_PRICE_INR
-    pro_plan_price_inr: int = PRO_PLAN_PRICE_INR
-    pro_plan_original_price_inr: int = PRO_PLAN_ORIGINAL_PRICE_INR
+    pro_plan_price_inr: int = PRO_PLAN_PRICE_INR  # Rs 151
+    pro_plan_original_price_inr: Optional[int] = None
+    super_plan_price_inr: int = SUPER_PLAN_PRICE_INR  # Rs 219
+    super_plan_original_price_inr: int = SUPER_PLAN_ORIGINAL_PRICE_INR
     can_generate_stories: bool
     can_clone_voices: bool
     subscription_expires_at: Optional[str] = None
@@ -82,8 +92,9 @@ def get_subscription_status(current_user: dict = Depends(get_current_user)):
         original 30-day trial (grandfathered).
       - After the trial lapses with no payment: Create is locked (0 custom
         stories, 0 clones) but the Library stays free to browse forever.
-      - Normal (Rs 99/month): 3 stories/month (~3 min each), no voice cloning.
-      - Pro (Rs 219/month, shown as a discount off Rs 299): 8 stories/month
+      - Normal (Rs 99/month): listen only - Library, no story creation.
+      - Pro (Rs 151/month): 5 AI stories/month (~3 min each), no cloning.
+      - Super (Rs 219/month, shown as a discount off Rs 299): 8 stories/month
         (~5 min each) + 4 cloned-voice narrations/month (~3 min each).
     Admin accounts (bibekjobs@gmail.com) get permanent VIP Pro access.
     get_current_user() already downgrades an expired paid tier back to
@@ -108,7 +119,9 @@ def get_subscription_status(current_user: dict = Depends(get_current_user)):
             "plan_price_inr": 0,
             "normal_plan_price_inr": NORMAL_PLAN_PRICE_INR,
             "pro_plan_price_inr": PRO_PLAN_PRICE_INR,
-            "pro_plan_original_price_inr": PRO_PLAN_ORIGINAL_PRICE_INR,
+            "pro_plan_original_price_inr": None,
+            "super_plan_price_inr": SUPER_PLAN_PRICE_INR,
+            "super_plan_original_price_inr": SUPER_PLAN_ORIGINAL_PRICE_INR,
             "can_generate_stories": True,
             "can_clone_voices": True,
             "subscription_expires_at": None,
@@ -117,13 +130,18 @@ def get_subscription_status(current_user: dict = Depends(get_current_user)):
     trial_info = get_trial_info(current_user.get("created_at"))
     is_trial_active = (not is_subscribed) and trial_info["is_trial_active"]
 
-    can_generate = is_subscribed or is_trial_active
-    can_clone = is_admin or tier in PRO_TIERS
+    # Normal (Rs 99) is listen-only, so only Pro / Super subscribers and
+    # active free trials can create stories.
+    can_generate = (tier in PRO_TIERS) or (tier in SUPER_TIERS) or is_trial_active
+    can_clone = is_admin or tier in SUPER_TIERS
 
     if is_subscribed:
-        plan_tier = "pro" if tier in PRO_TIERS else "normal"
-        plan_name = "Bedtime Story Pro" if tier in PRO_TIERS else "Bedtime Story Normal"
-        plan_price = PRO_PLAN_PRICE_INR if tier in PRO_TIERS else NORMAL_PLAN_PRICE_INR
+        if tier in SUPER_TIERS:
+            plan_tier, plan_name, plan_price = "super", "Bedtime Story Super", SUPER_PLAN_PRICE_INR
+        elif tier in PRO_TIERS:
+            plan_tier, plan_name, plan_price = "pro", "Bedtime Story Pro", PRO_PLAN_PRICE_INR
+        else:
+            plan_tier, plan_name, plan_price = "normal", "Bedtime Story Normal", NORMAL_PLAN_PRICE_INR
     elif is_trial_active:
         plan_tier = "trial"
         plan_name = "Free Trial"
@@ -147,7 +165,9 @@ def get_subscription_status(current_user: dict = Depends(get_current_user)):
         "plan_price_inr": plan_price,
         "normal_plan_price_inr": NORMAL_PLAN_PRICE_INR,
         "pro_plan_price_inr": PRO_PLAN_PRICE_INR,
-        "pro_plan_original_price_inr": PRO_PLAN_ORIGINAL_PRICE_INR,
+        "pro_plan_original_price_inr": None,
+        "super_plan_price_inr": SUPER_PLAN_PRICE_INR,
+        "super_plan_original_price_inr": SUPER_PLAN_ORIGINAL_PRICE_INR,
         "can_generate_stories": can_generate,
         "can_clone_voices": can_clone,
         "subscription_expires_at": current_user.get("subscription_expires_at"),
@@ -176,10 +196,14 @@ class CreateOrderResponse(BaseModel):
 
 def _resolve_plan(plan_id: Optional[str]) -> tuple:
     """Returns (normalized_plan_id, amount_inr) for a requested plan_id."""
-    normalized = (plan_id or "pro_monthly").lower().strip()
+    normalized = (plan_id or "super_monthly").lower().strip()
     if normalized in ("normal_monthly", "normal", "monthly_51", "monthly_99"):
-        return "normal_monthly", NORMAL_PLAN_PRICE_INR
-    return "pro_monthly", PRO_PLAN_PRICE_INR
+        return PLAN_KEY_NORMAL, NORMAL_PLAN_PRICE_INR
+    if normalized in ("pro151_monthly", "pro_151", "pro151"):
+        return PLAN_KEY_PRO, PRO_PLAN_PRICE_INR
+    # "super_monthly", and the legacy "pro_monthly" / "monthly_199" keys that
+    # older app versions sent for the Rs 219 plan.
+    return PLAN_KEY_SUPER, SUPER_PLAN_PRICE_INR
 
 
 @router.post("/create-order", response_model=CreateOrderResponse)
@@ -260,7 +284,12 @@ LIVE_AUTOPAY_STATUSES = ("authenticated", "active", "pending", "cancelling")
 
 def _razorpay_plan_id(plan_id: str) -> str:
     """Maps our plan id to the Razorpay Subscriptions plan created in the dashboard."""
-    rp_plan = settings.RAZORPAY_PLAN_ID_NORMAL if plan_id == "normal_monthly" else settings.RAZORPAY_PLAN_ID_PRO
+    if plan_id == PLAN_KEY_NORMAL:
+        rp_plan = settings.RAZORPAY_PLAN_ID_NORMAL
+    elif plan_id == PLAN_KEY_PRO:
+        rp_plan = settings.RAZORPAY_PLAN_ID_PRO151
+    else:
+        rp_plan = settings.RAZORPAY_PLAN_ID_PRO  # Rs 219 Super
     if not rp_plan:
         raise HTTPException(status_code=500, detail="Auto-renew isn't configured on the server (missing Razorpay plan id).")
     return rp_plan
@@ -313,7 +342,7 @@ def _grant_from_subscription(client, supabase, subscription_id: str, payment_ent
         return None
     sub_row = row.data[0]
     user_id = sub_row["user_id"]
-    granted_tier = NORMAL_TIER_NAME if sub_row.get("plan") == "normal_monthly" else PRO_TIER_NAME
+    granted_tier = tier_for_plan_key(sub_row.get("plan"))
 
     rp_sub = client.subscription.fetch(subscription_id)
     rp_status = rp_sub.get("status")
@@ -484,11 +513,10 @@ def verify_autopay(
         raise HTTPException(status_code=409, detail="This subscription is no longer active.")
 
     plan_key = row.data[0].get("plan")
-    granted_tier = NORMAL_TIER_NAME if plan_key == "normal_monthly" else PRO_TIER_NAME
-    is_pro = granted_tier == PRO_TIER_NAME
+    granted_tier = tier_for_plan_key(plan_key)
     return {
         "success": True,
-        "message": f"Subscription active! {'Pro' if is_pro else 'Normal'} renews automatically every month.",
+        "message": f"Subscription active! {plan_label_for_tier(granted_tier)} renews automatically every month.",
         "subscription_tier": granted_tier,
         "is_subscribed": True,
         "expires_at": expires_at.isoformat(),
@@ -581,7 +609,6 @@ def verify_subscription_payment(
         raise HTTPException(status_code=403, detail="This order does not belong to your account.")
 
     granted_tier = plan_for_amount(record.get("amount_inr"))
-    is_pro = granted_tier == PRO_TIER_NAME
 
     if record.get("status") == "captured":
         # Already processed (e.g. webhook got there first) - idempotent success.
@@ -624,7 +651,9 @@ def verify_subscription_payment(
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }).eq("id", current_user["id"]).execute()
 
-    plan_label = "Pro" if is_pro else "Normal"
+    plan_label = plan_label_for_tier(granted_tier)
+    is_super = granted_tier in SUPER_TIERS
+    is_pro_plan = granted_tier in PRO_TIERS
     return {
         "success": True,
         "message": f"Payment verified! {plan_label} is active until {expires_at.strftime('%d %b %Y')}.",
@@ -632,8 +661,8 @@ def verify_subscription_payment(
         "is_subscribed": True,
         "expires_at": expires_at.isoformat(),
         "unlocked_features": {
-            "custom_stories_per_month": 8 if is_pro else 3,
-            "voice_clones_per_month": 4 if is_pro else 0,
+            "custom_stories_per_month": 8 if is_super else (5 if is_pro_plan else 0),
+            "voice_clones_per_month": 4 if is_super else 0,
             "unlimited_library_access": True,
             "unlimited_children_profiles": True,
             "hd_soundscapes": True,

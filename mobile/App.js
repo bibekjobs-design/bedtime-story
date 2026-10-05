@@ -10,7 +10,7 @@ import { api, setOnUnauthorizedHandler } from "./src/api/client";
 LogBox.ignoreAllLogs(true);
 
 import AgeGroupScreen from "./src/screens/AgeGroupScreen";
-import LibraryScreen from "./src/screens/LibraryScreen";
+import HomeFeedScreen from "./src/screens/HomeFeedScreen";
 import CreateScreen from "./src/screens/CreateScreen";
 import PlayerScreen from "./src/screens/PlayerScreen";
 import LoginScreen from "./src/screens/LoginScreen";
@@ -24,6 +24,7 @@ import AdminDashboardScreen from "./src/screens/AdminDashboardScreen";
 import ParentalGateModal from "./src/components/ParentalGateModal";
 import SubscriptionModal from "./src/components/SubscriptionModal";
 import StarryBackground from "./src/components/StarryBackground";
+import NotificationBell from "./src/components/NotificationBell";
 
 function getInitialAuthFlow() {
   if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -42,7 +43,7 @@ export default function App() {
   const [currentStep, setCurrentStep] = useState(initialAuth.step);
   const [selectedAgeGroup, setSelectedAgeGroup] = useState(null);
   const [selectedStory, setSelectedStory] = useState(null);
-  const [playerOrigin, setPlayerOrigin] = useState("library"); // where to go back to from the Player
+  const [playerOrigin, setPlayerOrigin] = useState("home"); // where to go back to from the Player
   const [resetToken, setResetToken] = useState(initialAuth.token);
 
   // Auth & Profile state
@@ -54,6 +55,7 @@ export default function App() {
   const [pendingParentTarget, setPendingParentTarget] = useState("profiles"); // 'profiles' | 'login'
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [categoryBackStep, setCategoryBackStep] = useState("home"); // where Back goes from a category page
 
   // Real safe-area bottom inset (gesture bar / home indicator height) instead
   // of a guessed fixed value, so the nav bar sits correctly above it.
@@ -194,6 +196,10 @@ export default function App() {
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
 
+      {currentStep === "home" && (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "#05060c" }]} />
+      )}
+
       {/* Always-Accessible Top Header Bar */}
       {!isPlayer && !isAuthScreen && currentStep !== "age" && (
         <View style={styles.topHeader}>
@@ -202,11 +208,21 @@ export default function App() {
             onPress={() => setCurrentStep("age")}
             activeOpacity={0.8}
           >
-            <Text style={styles.logoIcon}>🌙</Text>
-            <Text style={styles.logoText}>Bedtime Story</Text>
+            <View style={styles.sBadge}>
+              <Text style={styles.sBadgeText}>S</Text>
+            </View>
           </TouchableOpacity>
 
           <View style={styles.headerRightRow}>
+            <NotificationBell
+              userKey={currentUser?.id || "guest"}
+              onAction={(action) => {
+                // Buttons on announcements only ever open screens inside the app.
+                if (action === "plans") setShowSubscriptionModal(true);
+                else if (action === "library") setCurrentStep("home");
+                else if (["home", "create", "history"].includes(action)) setCurrentStep(action);
+              }}
+            />
             {currentUser ? (
               <>
                 <TouchableOpacity
@@ -252,7 +268,7 @@ export default function App() {
               setActiveProfile(profile);
               authStorage.saveActiveProfile(profile).catch(() => {});
             }
-            setCurrentStep("library");
+            setCurrentStep("home");
           }}
           onOpenLogin={handleDirectLoginPress}
           onOpenProfiles={() => setCurrentStep("profiles")}
@@ -262,23 +278,24 @@ export default function App() {
           onNotificationAction={(action) => {
             // Buttons on announcements only ever open screens inside the app.
             if (action === "plans") setShowSubscriptionModal(true);
-            else if (["library", "create", "history"].includes(action)) setCurrentStep(action);
+            else if (action === "library") setCurrentStep("home");
+            else if (["home", "create", "history"].includes(action)) setCurrentStep(action);
           }}
         />
       )}
 
-      {currentStep === "library" && (
-        <LibraryScreen
+      {currentStep === "home" && (
+        <HomeFeedScreen
           activeProfile={activeProfile}
           currentUser={currentUser}
           onPlayStory={(storyData) => {
             setSelectedStory(storyData);
-            setPlayerOrigin("library");
+            setPlayerOrigin("home");
             setCurrentStep("player");
           }}
-          onGoToHome={() => setCurrentStep("age")}
           onOpenCategory={(category) => {
             setSelectedCategory(category);
+            setCategoryBackStep("home");
             setCurrentStep("category");
           }}
         />
@@ -294,7 +311,7 @@ export default function App() {
             setPlayerOrigin("category");
             setCurrentStep("player");
           }}
-          onBack={() => setCurrentStep("library")}
+          onBack={() => setCurrentStep(categoryBackStep)}
         />
       )}
 
@@ -309,7 +326,7 @@ export default function App() {
             setPlayerOrigin("create");
             setCurrentStep("player");
           }}
-          onGoToHome={() => setCurrentStep("age")}
+          onGoToHome={() => setCurrentStep("home")}
           onGoToUpgrade={() => setShowSubscriptionModal(true)}
         />
       )}
@@ -322,12 +339,12 @@ export default function App() {
             setPlayerOrigin("history");
             setCurrentStep("player");
           }}
-          onGoToHome={() => setCurrentStep("age")}
+          onGoToHome={() => setCurrentStep("home")}
         />
       )}
 
       {currentStep === "admin_dashboard" && (
-        <AdminDashboardScreen onGoToHome={() => setCurrentStep("age")} />
+        <AdminDashboardScreen onGoToHome={() => setCurrentStep("home")} />
       )}
 
       {currentStep === "player" && selectedStory && (
@@ -429,22 +446,18 @@ export default function App() {
         }}
       />
 
-      {/* Bottom Navigation Bar - 4 tabs */}
-      {!isPlayer && !isAuthScreen && (
-        <View style={[styles.bottomNav, { paddingBottom: 20 + bottomInset }]}>
-          <TouchableOpacity style={styles.navItem} onPress={() => setCurrentStep("age")}>
+      {/* Bottom Navigation Bar - 4 tabs (hidden on the profile picker) */}
+      {!isPlayer && !isAuthScreen && currentStep !== "age" && (
+        <View style={[styles.bottomNav, { paddingBottom: 8, bottom: 12 + bottomInset }]}>
+          <TouchableOpacity style={[styles.navItem, currentStep === "home" && styles.navItemActive]} onPress={() => setCurrentStep("home")}>
             <Text style={styles.navIcon}>🏠</Text>
-            <Text style={[styles.navText, currentStep === "age" && styles.navTextActive]}>Home</Text>
+            <Text style={[styles.navText, currentStep === "home" && styles.navTextActive]}>Home</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => setCurrentStep("library")}>
-            <Text style={styles.navIcon}>📚</Text>
-            <Text style={[styles.navText, currentStep === "library" && styles.navTextActive]}>Library</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => setCurrentStep("create")}>
+          <TouchableOpacity style={[styles.navItem, currentStep === "create" && styles.navItemActive]} onPress={() => setCurrentStep("create")}>
             <Text style={styles.navIcon}>✨</Text>
             <Text style={[styles.navText, currentStep === "create" && styles.navTextActive]}>Create</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => setCurrentStep("history")}>
+          <TouchableOpacity style={[styles.navItem, currentStep === "history" && styles.navItemActive]} onPress={() => setCurrentStep("history")}>
             <Text style={styles.navIcon}>🕘</Text>
             <Text style={[styles.navText, currentStep === "history" && styles.navTextActive]}>History</Text>
           </TouchableOpacity>
@@ -543,22 +556,45 @@ const styles = StyleSheet.create({
       web: { position: "fixed" },
       default: { position: "absolute" }
     }),
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(9, 12, 26, 0.94)",
-    borderTopWidth: 1,
-    borderTopColor: "rgba(147, 51, 234, 0.25)",
+    bottom: 12,
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(38, 38, 46, 0.97)",
+    borderRadius: 34,
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 10,
+    paddingTop: 8,
     zIndex: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 12,
     ...(Platform.OS === 'web' ? { backdropFilter: 'blur(25px)' } : {}),
+  },
+  navItemActive: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: 26,
+  },
+  sBadge: {
+    width: 36,
+    height: 42,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sBadgeText: {
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: "900",
+    color: "#e50914",
+    fontFamily: "serif",
   },
   navItem: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 6,
   },
   navIcon: {
     fontSize: 19,

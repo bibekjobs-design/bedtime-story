@@ -12,16 +12,19 @@ TIER_LIMITS = {
     # protected by tts_usage_service's free-quota cost guard so trial
     # signups can never push the platform over Google TTS's shared free
     # monthly character quota.
-    "free":            {"new_story_generation": 3, "voice_clone_story": 0, "personalization": 3},
+    "free":            {"new_story_generation": 1, "voice_clone_story": 0, "personalization": 1},
     # "free_expired" = trial has lapsed and the user never subscribed.
     # Create/generation is fully locked; the pre-made Library stays free
     # and unlimited to browse forever (Library endpoints don't check usage
     # at all, so this only affects Create/convert/personalize).
     "free_expired":    {"new_story_generation": 0, "voice_clone_story": 0, "personalization": 0},
-    # Normal plan - Rs 99/month. 3 stories/month, each capped at ~3 minutes
-    # (see story_service.NORMAL_TIER_TARGET_WORDS). No voice cloning at this tier.
-    "normal_monthly":  {"new_story_generation": 3, "voice_clone_story": 0, "personalization": 3},
-    # Pro plan - Rs 219/month (shown as a discount off Rs 299). 8 file-generated
+    # Normal plan - Rs 99/month. LISTEN ONLY: the Library, but no story creation
+    # and no voice cloning.
+    "normal_monthly":  {"new_story_generation": 0, "voice_clone_story": 0, "personalization": 0},
+    # Pro plan (Rs 151/month): 5 AI-narrated stories/month, ~3 minutes each
+    # (story_service.NORMAL_TIER_TARGET_WORDS). No voice cloning.
+    "pro_monthly":     {"new_story_generation": 5, "voice_clone_story": 0, "personalization": 5},
+    # Super plan (tier name premium_*) - Rs 219/month (shown as a discount off Rs 299). 8 file-generated
     # stories/month capped at ~5 minutes (see story_service.PRO_TIER_TARGET_WORDS),
     # plus 4 cloned-voice narrations/month capped per-narration at
     # CLONED_VOICE_CHAR_LIMIT chars (~3 min).

@@ -134,7 +134,7 @@ def get_admin_dashboard(current_user: dict = Depends(require_admin)):
             except (ValueError, TypeError):
                 pass
 
-    premium_tiers = ("premium", "premium_monthly", "premium_annual")  # "Pro" plan
+    premium_tiers = ("premium", "premium_monthly", "premium_annual", "pro_monthly")  # Pro (Rs 151) + Super (Rs 219) plans
     normal_tiers = ("normal_monthly",)  # "Normal" plan
     premium_users = sum(tier_counts.get(t, 0) for t in premium_tiers)
     normal_users = sum(tier_counts.get(t, 0) for t in normal_tiers)

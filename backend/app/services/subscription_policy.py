@@ -12,15 +12,18 @@ Pricing model (effective from TRIAL_POLICY_CUTOVER):
   - Users who signed up BEFORE the cutover keep their original 30-day
     trial (grandfathered - per explicit product decision), so nobody who
     was already mid-trial gets cut short by this change shipping.
-  - Two paid plans once the trial ends:
-      Normal  - Rs 99/month  - 3 stories/month, ~3 min each, no voice cloning
-      Pro     - Rs 219/month (shown with a struck-through Rs 299 "was"
+  - Three paid plans once the trial ends (Oct 2026 restructure):
+      Normal  - Rs 99/month  - LISTEN ONLY: the whole pre-made Library, no
+                story creation, no voice cloning
+      Pro     - Rs 151/month - 5 AI-narrated stories/month (~3 min each),
+                no voice cloning
+      Super   - Rs 219/month (shown with a struck-through Rs 299 "was"
                 price) - 8 stories/month at ~5 min each, + 4 cloned-voice
                 narrations/month (each capped at CLONED_VOICE_CHAR_LIMIT
-                characters, ~3 min)
-  - Existing payers who were already on the old flat Rs 199/month plan are
-    auto-migrated to Pro (tier name "premium_monthly"/"premium_annual" is
-    unchanged, per explicit product decision - no re-selection needed).
+                characters, ~3 min). This is exactly what "Pro" used to be,
+                so existing Rs 219 subscribers (tier "premium_monthly")
+                simply become Super with nothing to re-select.
+  - The free trial gives 1 AI story.
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -44,21 +47,49 @@ EXISTING_USERS_TRIAL_END = datetime(2026, 10, 30, 18, 30, tzinfo=timezone.utc)
 
 # Plan pricing (INR)
 NORMAL_PLAN_PRICE_INR = 99
-PRO_PLAN_PRICE_INR = 219
-PRO_PLAN_ORIGINAL_PRICE_INR = 299  # shown struck-through next to the Rs 219 "discount" price
+PRO_PLAN_PRICE_INR = 151
+SUPER_PLAN_PRICE_INR = 219
+SUPER_PLAN_ORIGINAL_PRICE_INR = 299  # shown struck-through next to the Rs 219 "discount" price
 
 # Tier names granted on payment, keyed by which plan was purchased.
 NORMAL_TIER_NAME = "normal_monthly"
-PRO_TIER_NAME = "premium_monthly"  # unchanged from the old single-plan tier name
+PRO_TIER_NAME = "pro_monthly"        # NEW Rs 151 plan
+SUPER_TIER_NAME = "premium_monthly"  # the old "Pro" (Rs 219) - tier name unchanged on purpose
+
+# Plan keys stored in the autopay_subscriptions table. The Rs 219 plan keeps
+# its historical key "pro_monthly" so existing subscriptions/webhooks keep
+# resolving to the right tier.
+PLAN_KEY_NORMAL = "normal_monthly"
+PLAN_KEY_PRO = "pro151_monthly"
+PLAN_KEY_SUPER = "pro_monthly"
 
 PAID_DURATION_DAYS = 30
 
-# Tiers that count as "Pro" (full story quota + voice cloning).
-PRO_TIERS = ("premium", "premium_monthly", "premium_annual", "admin", "admin_vip")
-# Tiers that count as "Normal" (paid, but no cloning).
+# Tiers that count as "Super" (full story quota + voice cloning).
+SUPER_TIERS = ("premium", "premium_monthly", "premium_annual", "admin", "admin_vip")
+# Tiers that count as "Pro" (Rs 151: 5 stories, no cloning).
+PRO_TIERS = ("pro_monthly",)
+# Tiers that count as "Normal" (Rs 99: listen only).
 NORMAL_TIERS = ("normal_monthly",)
-# Any tier that represents an active paid subscription of either kind.
-PAID_TIERS = PRO_TIERS + NORMAL_TIERS
+# Any tier that represents an active paid subscription of any kind.
+PAID_TIERS = SUPER_TIERS + PRO_TIERS + NORMAL_TIERS
+
+
+def tier_for_plan_key(plan_key) -> str:
+    """Maps a stored plan key back to the tier it grants."""
+    if plan_key == PLAN_KEY_NORMAL:
+        return NORMAL_TIER_NAME
+    if plan_key == PLAN_KEY_PRO:
+        return PRO_TIER_NAME
+    return SUPER_TIER_NAME
+
+
+def plan_label_for_tier(tier) -> str:
+    if tier in SUPER_TIERS:
+        return "Super"
+    if tier in PRO_TIERS:
+        return "Pro"
+    return "Normal"
 
 
 def _parse_dt(value) -> Optional[datetime]:
@@ -123,13 +154,15 @@ def is_trial_active(created_at) -> bool:
 
 def plan_for_amount(amount_inr) -> str:
     """Maps a captured payment's amount back to the tier it should grant.
-    Defaults to Pro on an unrecognized amount so a payment never grants
+    Defaults to Super on an unrecognized amount so a payment never grants
     nothing - it's better to slightly over-grant than to take someone's
     money and give them no plan at all."""
     try:
         amount = int(round(float(amount_inr)))
     except (TypeError, ValueError):
-        return PRO_TIER_NAME
+        return SUPER_TIER_NAME
     if amount == NORMAL_PLAN_PRICE_INR:
         return NORMAL_TIER_NAME
-    return PRO_TIER_NAME
+    if amount == PRO_PLAN_PRICE_INR:
+        return PRO_TIER_NAME
+    return SUPER_TIER_NAME

@@ -108,7 +108,7 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
     # reads current_user["subscription_tier"] (usage limits, story gating,
     # etc.) sees the true state, not a stale "premium_monthly" forever.
     expires_at = user.get("subscription_expires_at")
-    if expires_at and user.get("subscription_tier") in ("premium", "premium_monthly", "premium_annual", "normal_monthly"):
+    if expires_at and user.get("subscription_tier") in ("premium", "premium_monthly", "premium_annual", "normal_monthly", "pro_monthly"):
         try:
             expires_dt = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
             if datetime.now(timezone.utc) > expires_dt:

@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app.auth import get_current_user_optional
 from app.db import get_supabase
-from app.services.subscription_policy import NORMAL_TIERS, PRO_TIERS
+from app.services.subscription_policy import NORMAL_TIERS, PRO_TIERS, SUPER_TIERS
 
 router = APIRouter(prefix="/api/announcements", tags=["Announcements"])
 
@@ -20,7 +20,8 @@ def _audiences_for(user) -> set:
     tier = (user.get("subscription_tier") or "").lower().strip()
     if tier in ("admin", "admin_vip", "superadmin"):
         return {"all", "free", "normal", "pro"}
-    if tier in PRO_TIERS:
+    if tier in SUPER_TIERS or tier in PRO_TIERS:
+        # "pro" audience = anyone on a creating plan (Pro or Super)
         return {"all", "pro"}
     if tier in NORMAL_TIERS:
         return {"all", "normal"}

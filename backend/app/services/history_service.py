@@ -67,7 +67,28 @@ def get_user_history(user_id: str, limit: int = 60) -> list:
         .limit(limit)
         .execute()
     )
-    return res.data or []
+    rows = res.data or []
+
+    # Attach each story's cover picture (if it has one) so History can show
+    # it. Read-only lookup; failures just mean cards use the placeholder.
+    try:
+        ids = list({r["story_text_id"] for r in rows if r.get("story_text_id")})
+        if ids:
+            covers = (
+                supabase.table("story_texts")
+                .select("id, cover_image_url")
+                .in_("id", ids)
+                .execute()
+                .data
+                or []
+            )
+            cover_by_id = {c["id"]: c.get("cover_image_url") for c in covers}
+            for r in rows:
+                r["cover_image_url"] = cover_by_id.get(r.get("story_text_id"))
+    except Exception as e:
+        print(f"[history_service] Could not attach cover pictures (non-fatal): {e}")
+
+    return rows
 
 
 def get_user_creations_with_ratings(user_id: str, limit: int = 60) -> list:
@@ -96,7 +117,7 @@ def get_user_creations_with_ratings(user_id: str, limit: int = 60) -> list:
     if story_ids:
         stories = (
             supabase.table("story_texts")
-            .select("id, title, average_rating, total_ratings")
+            .select("id, title, average_rating, total_ratings, cover_image_url")
             .in_("id", story_ids)
             .execute()
             .data
@@ -111,6 +132,7 @@ def get_user_creations_with_ratings(user_id: str, limit: int = 60) -> list:
         results.append({
             "story_text_id": sid,
             "title": story.get("title") or e.get("title"),
+            "cover_image_url": story.get("cover_image_url"),
             "created_at": e.get("created_at"),
             "average_rating": story.get("average_rating") or 0,
             "total_ratings": story.get("total_ratings") or 0,

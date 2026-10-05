@@ -36,21 +36,35 @@ const PLANS = {
     label: "Normal",
     price: 99,
     originalPrice: null,
-    tagline: "3 new stories a month, unlimited Library",
+    tagline: "Listen to every story in the Library, anytime",
     emoji: "📖",
     benefits: [
       { icon: "🎧", text: "Unlimited Library Stories & offline playback" },
-      { icon: "✨", text: "3 Custom AI Stories / month (up to 3 min each)" },
+      { icon: "🧸", text: "Unlimited Child Profiles with custom sleep timers" },
+      { icon: "🌲", text: "All 5 Story-Matched HD Soundscapes" },
+      { icon: "🔒", text: "Listening only - creating new stories is part of Pro and Super" },
+    ],
+  },
+  pro: {
+    id: "pro151_monthly",
+    label: "Pro",
+    price: 151,
+    originalPrice: null,
+    tagline: "Everything in Normal, plus AI-narrated stories you create",
+    emoji: "✨",
+    benefits: [
+      { icon: "🎧", text: "Unlimited Library Stories & offline playback" },
+      { icon: "✨", text: "5 Custom AI Stories / month, narrated by Luna & friends (up to 3 min each)" },
       { icon: "🧸", text: "Unlimited Child Profiles with custom sleep timers" },
       { icon: "🌲", text: "All 5 Story-Matched HD Soundscapes" },
     ],
   },
-  pro: {
-    id: "pro_monthly",
-    label: "Pro",
+  super: {
+    id: "super_monthly",
+    label: "Super",
     price: 219,
     originalPrice: 299,
-    tagline: "Everything in Normal, plus parent voice cloning",
+    tagline: "Everything in Pro, plus parent voice cloning",
     emoji: "👑",
     benefits: [
       { icon: "🎧", text: "Unlimited Library Stories & offline playback" },
@@ -72,7 +86,7 @@ export default function SubscriptionModal({
   const [error, setError] = useState(null);
   const [successCelebration, setSuccessCelebration] = useState(false);
   const [selectedPlanKey, setSelectedPlanKey] = useState(
-    defaultPlan === "normal" ? "normal" : "pro"
+    PLANS[defaultPlan] ? defaultPlan : "pro"
   );
   const plan = PLANS[selectedPlanKey];
   // "autopay" = Subscribe monthly (renews automatically, cancel anytime)

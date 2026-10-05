@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Image,
   ActivityIndicator,
   Alert,
   Modal,
@@ -15,6 +16,39 @@ import * as FileSystem from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { colors } from "../theme/colors";
 import { api } from "../api/client";
+
+// Cover picture for the player: the story's own cover if it has one,
+// otherwise a coloured card with an emoji picked from the title.
+const COVER_EMOJI_RULES = [
+  [/rabbit|hare|bunny/i, "🐰"], [/tortoise|turtle/i, "🐢"], [/fox/i, "🦊"], [/owl/i, "🦉"],
+  [/elephant/i, "🐘"], [/bear/i, "🐻"], [/lion/i, "🦁"], [/tiger/i, "🐯"], [/monkey/i, "🐵"],
+  [/sheep|lamb/i, "🐑"], [/cat|kitten/i, "🐱"], [/dog|puppy/i, "🐶"], [/mouse|mice/i, "🐭"],
+  [/frog/i, "🐸"], [/duck/i, "🦆"], [/bird|crow|parrot|sparrow/i, "🐦"],
+  [/fish|whale|dolphin|ocean|sea/i, "🐠"], [/mermaid/i, "🧜"], [/dragon/i, "🐉"],
+  [/unicorn/i, "🦄"], [/fairy/i, "🧚"], [/castle|kingdom|king|queen|prince|princess/i, "🏰"],
+  [/wizard|magic|wand/i, "🪄"], [/rocket|space|astronaut/i, "🚀"], [/alien/i, "👽"],
+  [/planet/i, "🪐"], [/star/i, "⭐"], [/moon|night|sleep|dream|lullaby|goodnight/i, "🌙"],
+  [/sun/i, "☀️"], [/rain|cloud/i, "☁️"], [/forest|tree|woods/i, "🌳"], [/flower|garden/i, "🌸"],
+  [/pirate|ship|treasure/i, "🏴‍☠️"], [/train/i, "🚂"], [/boat/i, "⛵"], [/snow|winter/i, "❄️"],
+];
+const COVER_COLORS = ["#3a8f4d", "#5b3aa8", "#1f5fa8", "#c24d1a", "#a8265b", "#157a6a", "#2a2f6b"];
+
+function coverEmojiFor(title) {
+  const t = String(title || "");
+  const found = [];
+  for (const [re, em] of COVER_EMOJI_RULES) {
+    if (re.test(t)) found.push(em);
+    if (found.length === 2) break;
+  }
+  return found.length ? found.join("") : "🌙";
+}
+
+function coverColorFor(title) {
+  let h = 0;
+  const t = String(title || "");
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) % 9973;
+  return COVER_COLORS[h % COVER_COLORS.length];
+}
 
 const AMBIENT_SOUNDSCAPES = [
   {
@@ -55,6 +89,9 @@ const AMBIENT_SOUNDSCAPES = [
 ];
 
 export default function PlayerScreen({ story, onBack }) {
+  const [coverBroken, setCoverBroken] = useState(false);
+  const hasCover =
+    !coverBroken && typeof story.cover_image_url === "string" && story.cover_image_url.startsWith("http");
   // Voice Narration Audio State
   const [sound, setSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -451,10 +488,18 @@ export default function PlayerScreen({ story, onBack }) {
 
         {/* Ambient Glow Cover Art */}
         <View style={styles.coverArtBox}>
-          <View style={styles.coverArtGlow}>
-            <Text style={styles.coverEmoji}>🌙</Text>
-            <Text style={styles.coverSubEmoji}>⭐ 🧸 ☁️</Text>
-          </View>
+          {hasCover ? (
+            <Image
+              source={{ uri: story.cover_image_url }}
+              style={styles.coverImage}
+              resizeMode="cover"
+              onError={() => setCoverBroken(true)}
+            />
+          ) : (
+            <View style={[styles.coverImage, styles.coverPlaceholder, { backgroundColor: coverColorFor(story.title) }]}>
+              <Text style={styles.coverEmoji}>{coverEmojiFor(story.title)}</Text>
+            </View>
+          )}
         </View>
 
         {/* Story Details */}
@@ -808,6 +853,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 36,
+    overflow: "hidden",
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.cardBorder,
@@ -822,6 +868,16 @@ const styles = StyleSheet.create({
   },
   coverArtGlow: {
     alignItems: "center",
+  },
+  coverImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 36,
+  },
+  coverPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   coverEmoji: {
     fontSize: 66,

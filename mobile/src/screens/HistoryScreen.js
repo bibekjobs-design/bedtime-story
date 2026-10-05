@@ -8,30 +8,28 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
-import { colors } from "../theme/colors";
 import { api } from "../api/client";
 
-// Three categories the app narrates stories in, and how to file a history
-// entry under each - matches the "origin" the backend now records in
-// story_events (library / create_narrator / create_clone).
+const BG = "#05060c";
+
+// Three kinds of story the app narrates, and how a history entry is filed
+// under each - matches the "origin" the backend records in story_events
+// (library / create_narrator / create_clone).
 const CATEGORIES = [
   {
     key: "library",
-    title: "📚 Library",
-    subtitle: "Pre-made bedtime stories",
-    emptyText: "Stories you play from the Library will appear here.",
+    title: "Home stories",
+    emptyText: "Stories you play from Home will show up here.",
   },
   {
     key: "cloned",
-    title: "🎙️ Cloned Parent Voice",
-    subtitle: "Narrated in Mom or Dad's own voice",
-    emptyText: "Stories narrated with a cloned parent voice will appear here.",
+    title: "Cloned Parent Voice",
+    emptyText: "Stories narrated with a cloned parent voice will show up here.",
   },
   {
     key: "ai",
-    title: "✨ AI Voice (Luna & friends)",
-    subtitle: "Custom stories narrated by an AI storyteller",
-    emptyText: "Custom stories you generate with an AI narrator will appear here.",
+    title: "AI Voice (Luna & friends)",
+    emptyText: "Custom stories you generate with an AI narrator will show up here.",
   },
 ];
 
@@ -40,6 +38,68 @@ const ORIGIN_MAP = {
   create_narrator: "ai",
   create_clone: "cloned",
 };
+
+// Placeholder look for stories without a cover picture: coloured card with
+// an emoji picked from the title.
+const EMOJI_RULES = [
+  [/rabbit|hare|bunny/i, "🐰"],
+  [/tortoise|turtle/i, "🐢"],
+  [/fox/i, "🦊"],
+  [/owl/i, "🦉"],
+  [/elephant/i, "🐘"],
+  [/bear/i, "🐻"],
+  [/lion/i, "🦁"],
+  [/tiger/i, "🐯"],
+  [/monkey/i, "🐵"],
+  [/sheep|lamb/i, "🐑"],
+  [/cat|kitten/i, "🐱"],
+  [/dog|puppy/i, "🐶"],
+  [/mouse|mice/i, "🐭"],
+  [/frog/i, "🐸"],
+  [/duck/i, "🦆"],
+  [/bird|crow|parrot|sparrow/i, "🐦"],
+  [/fish|whale|dolphin|ocean|sea/i, "🐠"],
+  [/mermaid/i, "🧜"],
+  [/dragon/i, "🐉"],
+  [/unicorn/i, "🦄"],
+  [/fairy/i, "🧚"],
+  [/castle|kingdom|king|queen|prince|princess/i, "🏰"],
+  [/wizard|magic|wand/i, "🪄"],
+  [/rocket|space|astronaut/i, "🚀"],
+  [/alien/i, "👽"],
+  [/planet/i, "🪐"],
+  [/star/i, "⭐"],
+  [/moon|night|sleep|dream|lullaby|goodnight/i, "🌙"],
+  [/sun/i, "☀️"],
+  [/rain|cloud/i, "☁️"],
+  [/forest|tree|woods/i, "🌳"],
+  [/flower|garden/i, "🌸"],
+  [/pirate|ship|treasure/i, "🏴‍☠️"],
+  [/train/i, "🚂"],
+  [/boat/i, "⛵"],
+  [/snow|winter/i, "❄️"],
+];
+const GRADIENT_COLORS = [
+  "#3a8f4d", "#5b3aa8", "#1f5fa8", "#c24d1a", "#a8265b", "#157a6a", "#2a2f6b",
+];
+
+function emojiFor(title) {
+  const t = String(title || "");
+  const found = [];
+  for (const [re, em] of EMOJI_RULES) {
+    if (re.test(t)) found.push(em);
+    if (found.length === 2) break;
+  }
+  return found.length ? found.join("") : "🌙";
+}
+
+function colorFor(title) {
+  let h = 0;
+  const t = String(title || "");
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) % 9973;
+  return GRADIENT_COLORS[h % GRADIENT_COLORS.length];
+}
+
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -58,30 +118,67 @@ function timeAgo(iso) {
 
 function groupByOrigin(events) {
   const groups = { library: [], cloned: [], ai: [] };
+  const seen = new Set();
+  // Events arrive newest-first, so the first one we meet for a story is its
+  // latest play. Replaying the same story many times shows it only once.
   for (const item of events) {
     const origin = ORIGIN_MAP[item.origin] || "ai";
-    // Normalize field names to what the card renderer below expects
-    // (server rows use created_at; the old local format used played_at).
-    const normalized = { ...item, played_at: item.created_at };
-    groups[origin].push(normalized);
+    const storyKey = item.story_text_id || String(item.title || "").trim().toLowerCase();
+    const key = origin + "|" + storyKey + "|" + (origin === "cloned" ? item.voice_clone_id || "" : "");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // Server rows use created_at; the card code below uses played_at.
+    groups[origin].push({ ...item, played_at: item.created_at });
   }
   return groups;
+}
+
+function HistoryCard({ title, cover, emoji, line, tag, onPress }) {
+  const [broken, setBroken] = useState(false);
+  const hasCover = !broken && typeof cover === "string" && cover.startsWith("http");
+  return (
+    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.card}>
+      {hasCover ? (
+        <Image
+          source={{ uri: cover }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, styles.placeholder, { backgroundColor: colorFor(title) }]}>
+          <View style={styles.placeholderShade} />
+          <Text style={styles.placeholderEmoji}>{emoji || emojiFor(title)}</Text>
+        </View>
+      )}
+      <View style={styles.titleShade1} pointerEvents="none" />
+      <View style={styles.titleShade2} pointerEvents="none" />
+      <View style={styles.cardTextWrap} pointerEvents="none">
+        <Text style={styles.cardTitle} numberOfLines={2}>
+          {title}
+        </Text>
+        {line ? <Text style={styles.cardLine}>{line}</Text> : null}
+      </View>
+      {tag ? (
+        <View style={styles.tagBadge}>
+          <Text style={styles.tagBadgeText}>{tag}</Text>
+        </View>
+      ) : null}
+    </TouchableOpacity>
+  );
 }
 
 export default function HistoryScreen({ step, onPlayStory, onGoToHome }) {
   const [history, setHistory] = useState([]);
   const [creations, setCreations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [openSection, setOpenSection] = useState("library");
-  const [showCreations, setShowCreations] = useState(false);
 
   useEffect(() => {
     loadHistory();
     // Reload every time this tab becomes active, since a story may have
-    // been played (and recorded) from Library/Create/Clone since the last
-    // time History was open. History now lives on the server (story_events
-    // table), so it survives cache clears and follows the account across
-    // every device - it no longer depends on this device's local storage.
+    // been played (and recorded) since the last time History was open.
+    // History lives on the server (story_events table), so it follows the
+    // account across devices.
   }, [step]);
 
   async function loadHistory() {
@@ -107,14 +204,7 @@ export default function HistoryScreen({ step, onPlayStory, onGoToHome }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.titleSerif}>Bedtime History</Text>
-        <TouchableOpacity style={styles.homeBtn} onPress={onGoToHome}>
-          <Image source={require("../../assets/images/fox.jpg")} style={styles.homeBtnImg} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.listContent}>
+      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
         {loading ? (
           <ActivityIndicator size="large" color="#f5a623" style={{ marginTop: 50 }} />
         ) : totalCount === 0 ? (
@@ -122,122 +212,46 @@ export default function HistoryScreen({ step, onPlayStory, onGoToHome }) {
             <Text style={styles.emptyEmoji}>📖</Text>
             <Text style={styles.emptyTitle}>No bedtime history yet</Text>
             <Text style={styles.emptyText}>
-              Every story you listen to from the Library, AI Generator, or Parent Voice Clones
-              will show up here, grouped by type, so you can replay it in one tap.
+              Every story you listen to from Home, the AI Generator, or Parent Voice Clones
+              will show up here, in rows by type, so you can replay it in one tap.
             </Text>
           </View>
         ) : (
           <>
             {CATEGORIES.map((cat) => {
               const items = groups[cat.key];
-              const isOpen = openSection === cat.key;
               return (
-                <View key={cat.key} style={styles.categoryBlock}>
-                  <TouchableOpacity
-                    style={[styles.categoryHeader, isOpen && styles.categoryHeaderActive]}
-                    onPress={() => setOpenSection(isOpen ? null : cat.key)}
-                    activeOpacity={0.85}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.categoryTitle}>{cat.title}</Text>
-                      <Text style={styles.categorySubtitle}>{cat.subtitle}</Text>
-                    </View>
-                    {items.length > 0 && (
-                      <View style={styles.countBadge}>
-                        <Text style={styles.countBadgeText}>{items.length}</Text>
-                      </View>
-                    )}
-                    <Text style={styles.chevron}>{isOpen ? "▼" : "▶"}</Text>
-                  </TouchableOpacity>
-
-                  {isOpen && (
-                    <View style={styles.categoryBody}>
-                      {items.length === 0 ? (
-                        <Text style={styles.categoryEmptyText}>{cat.emptyText}</Text>
-                      ) : (
-                        items.map((item, idx) => (
-                          <TouchableOpacity
-                            key={item.id || `${item.story_text_id || idx}-${idx}`}
-                            style={styles.storyCard}
-                            activeOpacity={0.8}
-                            onPress={() => onPlayStory({ ...item, mode: "audio_only" })}
-                          >
-                            <View style={styles.storyThumb}>
-                              <Image
-                                source={require("../../assets/images/moon.jpg")}
-                                style={styles.thumbImg}
-                              />
-                            </View>
-                            <View style={styles.storyInfo}>
-                              <Text style={styles.storyTitle}>{item.title || "Bedtime Story"}</Text>
-                              <View style={styles.metaRow}>
-                                <Text style={styles.metaText}>
-                                  ⏱️ {item.duration_seconds ? Math.round(item.duration_seconds / 60) : 5}m
-                                </Text>
-                                <Text style={styles.metaText}>
-                                  {cat.key === "cloned" ? "🎙️ Parent Voice" : `🎤 ${item.voice_id || "Luna"}`}
-                                </Text>
-                                <Text style={styles.metaText}>{timeAgo(item.played_at)}</Text>
-                              </View>
-                            </View>
-                            <View style={styles.replayBtn}>
-                              <Text style={styles.replayBtnText}>▶️</Text>
-                            </View>
-                          </TouchableOpacity>
-                        ))
-                      )}
-                    </View>
+                <View key={cat.key}>
+                  <Text style={styles.rowTitle}>{cat.title}</Text>
+                  {items.length === 0 ? (
+                    <Text style={styles.rowEmpty}>{cat.emptyText}</Text>
+                  ) : (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.rowScroll}
+                    >
+                      {items.map((item, idx) => (
+                        <HistoryCard
+                          key={item.id || `${item.story_text_id || idx}-${idx}`}
+                          title={item.title || "Bedtime Story"}
+                          cover={item.cover_image_url}
+                          emoji={cat.key === "cloned" ? "🎙️" : undefined}
+                          tag={cat.key === "cloned" ? "🎙️ Parent" : null}
+                          line={
+                            (item.duration_seconds ? Math.round(item.duration_seconds / 60) : 5) +
+                            "m · " +
+                            timeAgo(item.played_at)
+                          }
+                          onPress={() => onPlayStory({ ...item, mode: "audio_only" })}
+                        />
+                      ))}
+                    </ScrollView>
                   )}
                 </View>
               );
             })}
 
-            {creations.length > 0 && (
-              <View style={styles.categoryBlock}>
-                <TouchableOpacity
-                  style={[styles.categoryHeader, showCreations && styles.categoryHeaderActive]}
-                  onPress={() => setShowCreations(!showCreations)}
-                  activeOpacity={0.85}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.categoryTitle}>⭐ My Creations</Text>
-                    <Text style={styles.categorySubtitle}>
-                      Stories you've uploaded, now in the shared Library - see how they're rated
-                    </Text>
-                  </View>
-                  <View style={styles.countBadge}>
-                    <Text style={styles.countBadgeText}>{creations.length}</Text>
-                  </View>
-                  <Text style={styles.chevron}>{showCreations ? "▼" : "▶"}</Text>
-                </TouchableOpacity>
-
-                {showCreations && (
-                  <View style={styles.categoryBody}>
-                    {creations.map((c, idx) => (
-                      <View key={c.story_text_id || idx} style={styles.storyCard}>
-                        <View style={styles.storyThumb}>
-                          <Image
-                            source={require("../../assets/images/moon.jpg")}
-                            style={styles.thumbImg}
-                          />
-                        </View>
-                        <View style={styles.storyInfo}>
-                          <Text style={styles.storyTitle}>{c.title || "Bedtime Story"}</Text>
-                          <View style={styles.metaRow}>
-                            <Text style={styles.metaText}>
-                              {c.total_ratings > 0
-                                ? `⭐ ${Number(c.average_rating).toFixed(1)} · ${c.total_ratings} rating${c.total_ratings === 1 ? "" : "s"}`
-                                : "No ratings yet"}
-                            </Text>
-                            <Text style={styles.metaText}>{timeAgo(c.created_at)}</Text>
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            )}
           </>
         )}
       </ScrollView>
@@ -246,213 +260,41 @@ export default function HistoryScreen({ step, onPlayStory, onGoToHome }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "transparent",
-    paddingTop: 40,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    marginBottom: 20,
-  },
-  titleSerif: {
-    fontSize: 28,
-    fontWeight: "800",
+  container: { flex: 1, backgroundColor: BG, paddingTop: 8 },
+  listContent: { paddingBottom: 130 },
+  rowTitle: {
     color: "#ffffff",
-    fontFamily: "serif",
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  homeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-    overflow: "hidden",
-  },
-  homeBtnImg: {
-    width: "100%",
-    height: "100%",
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 100, // space for bottom nav
-  },
-  categoryBlock: {
+    fontSize: 17,
+    fontWeight: "800",
+    marginTop: 20,
     marginBottom: 10,
+    marginHorizontal: 16,
   },
-  categoryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: "rgba(109, 40, 217, 0.2)",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(168, 85, 247, 0.25)",
-    borderLeftWidth: 4,
-    borderLeftColor: "#a855f7",
+  rowEmpty: { color: "#9ba1ba", fontSize: 13, marginHorizontal: 16, lineHeight: 18 },
+  rowScroll: { paddingHorizontal: 16, gap: 10 },
+
+  card: { width: 112, height: 164, borderRadius: 10, overflow: "hidden", backgroundColor: "#15172a" },
+  placeholder: { alignItems: "center", justifyContent: "center" },
+  placeholderShade: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.22)" },
+  placeholderEmoji: { fontSize: 44, marginBottom: 20 },
+  titleShade1: { position: "absolute", left: 0, right: 0, bottom: 0, height: 70, backgroundColor: "rgba(0,0,0,0.45)" },
+  titleShade2: { position: "absolute", left: 0, right: 0, bottom: 0, height: 38, backgroundColor: "rgba(0,0,0,0.4)" },
+  cardTextWrap: { position: "absolute", left: 8, right: 8, bottom: 8 },
+  cardTitle: { color: "#ffffff", fontSize: 12, fontWeight: "800", lineHeight: 15 },
+  cardLine: { color: "#ffe2a3", fontSize: 10, fontWeight: "700", marginTop: 3 },
+  tagBadge: {
+    position: "absolute",
+    left: 7,
+    top: 7,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
-  categoryHeaderActive: {
-    backgroundColor: "rgba(109, 40, 217, 0.38)",
-    borderColor: "rgba(192, 132, 252, 0.5)",
-    borderLeftColor: "#c084fc",
-    borderBottomLeftRadius: 4,
-    borderBottomRightRadius: 4,
-  },
-  categoryTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "800",
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  categorySubtitle: {
-    color: "#c3c9dc",
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 2,
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  countBadge: {
-    backgroundColor: "rgba(245, 166, 35, 0.2)",
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginRight: 10,
-  },
-  countBadgeText: {
-    color: "#f5a623",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  chevron: {
-    color: "#c084fc",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  categoryBody: {
-    paddingTop: 10,
-    paddingHorizontal: 4,
-  },
-  categoryEmptyText: {
-    color: "#9aa2b8",
-    fontSize: 12,
-    fontWeight: "600",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    lineHeight: 18,
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  storyCard: {
-    backgroundColor: "rgba(11, 14, 32, 0.85)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    borderRadius: 20,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  storyThumb: {
-    width: 60,
-    height: 60,
-    borderRadius: 14,
-    overflow: "hidden",
-    marginRight: 12,
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  thumbImg: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  storyInfo: {
-    flex: 1,
-  },
-  storyTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#ffffff",
-    fontFamily: "serif",
-    marginBottom: 6,
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  metaRow: {
-    flexDirection: "row",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  metaText: {
-    fontSize: 10.5,
-    fontWeight: "700",
-    color: "#e4e7f2",
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  replayBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(245, 166, 35, 0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 8,
-  },
-  replayBtnText: {
-    fontSize: 14,
-  },
-  clearBtn: {
-    marginTop: 14,
-    alignSelf: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  clearBtnText: {
-    color: "#9ba1ba",
-    fontSize: 13,
-    fontWeight: "600",
-    textDecorationLine: "underline",
-  },
-  emptyBox: {
-    alignItems: "center",
-    marginTop: 60,
-    paddingHorizontal: 20,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#ffffff",
-    marginBottom: 8,
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  emptyText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#c3c9dc",
-    textAlign: "center",
-    lineHeight: 19,
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
+  tagBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+
+  emptyBox: { alignItems: "center", marginTop: 60, paddingHorizontal: 30 },
+  emptyEmoji: { fontSize: 48, marginBottom: 10 },
+  emptyTitle: { color: "#ffffff", fontSize: 18, fontWeight: "800", marginBottom: 8 },
+  emptyText: { color: "#9ba1ba", fontSize: 14, textAlign: "center", lineHeight: 20 },
 });

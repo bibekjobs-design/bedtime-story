@@ -38,7 +38,7 @@ SHORT_IDEA_WORD_THRESHOLD = 30      # <= this many words = "an idea", ask Gemini
 TARGET_STORY_WORDS = 1000           # ~7-8 minutes at ~130 wpm (Library / admin default)
 STORY_WORD_TOLERANCE = 150          # allow up to +150 words to land on a clean sentence end
 
-# Pro plan (Rs 219/mo) Create-tab stories: ~5 minutes at the app's own
+# Super plan (Rs 219/mo) Create-tab stories: ~5 minutes at the app's own
 # ~135 wpm pace - shorter than the old ~7-8 min, per the product decision
 # to bring Pro's per-story cost down while still noticeably longer than
 # Normal/free trial.
@@ -58,8 +58,8 @@ FREE_TIER_TARGET_WORDS = 405        # ~3 minutes at ~135 wpm
 
 
 def target_words_for_tier(subscription_tier: str) -> int:
-    if subscription_tier == "normal_monthly":
-        return NORMAL_TIER_TARGET_WORDS
+    if subscription_tier in ("normal_monthly", "pro_monthly"):
+        return NORMAL_TIER_TARGET_WORDS  # Pro (Rs 151) stories are ~3 min, same as Normal's cap
     if subscription_tier == "free":
         return FREE_TIER_TARGET_WORDS
     if subscription_tier in ("premium", "premium_monthly", "premium_annual"):
@@ -73,7 +73,7 @@ def _enforce_free_tier_tts_budget(subscription_tier: str, char_count: int) -> No
     the whole platform over Google Cloud TTS's shared free monthly quota
     (see tts_usage_service), block it with a friendly message instead of
     silently incurring real cloud spend on an unpaid account. Paid tiers
-    (normal_monthly/premium*/admin*) are never blocked here - their TTS
+    (normal_monthly/pro_monthly/premium*/admin*) are never blocked here - their TTS
     cost is expected, revenue-covered usage, and admins are unlimited.
     """
     if subscription_tier != "free":
@@ -82,7 +82,7 @@ def _enforce_free_tier_tts_budget(subscription_tier: str, char_count: int) -> No
     if would_exceed_free_quota(char_count):
         raise ValueError(
             "Our free trial's narration credit for this month is fully used up right now. "
-            "Please try again next month, or upgrade to Normal (₹99/mo) or Pro (₹219/mo) to keep generating stories today."
+            "Please try again next month, or upgrade to Pro (₹151/mo) or Super (₹219/mo) to keep generating stories today."
         )
 
 TRUNCATION_NOTICE = (
@@ -530,9 +530,10 @@ def get_precreated_stories(
         }
         query = (
             supabase.table("story_texts")
-            .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url")
+            .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at")
             .eq("age_group_id", age_group_id)
             .eq("language_id", language_id)
+            .is_("owner_user_id", "null")
         )
         if sort_by == "newest":
             res = query.order("created_at", desc=True).limit(200).execute()
@@ -544,9 +545,10 @@ def get_precreated_stories(
 
     query = (
         supabase.table("story_texts")
-        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url")
+        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at")
         .eq("age_group_id", age_group_id)
         .eq("language_id", language_id)
+        .is_("owner_user_id", "null")
     )
 
     if category_id:
@@ -672,9 +674,10 @@ def search_stories(
     # 1. Search database
     db_query = (
         supabase.table("story_texts")
-        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url")
+        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at")
         .eq("age_group_id", age_group_id)
         .eq("language_id", language_id)
+        .is_("owner_user_id", "null")
     )
     if category_id:
         db_query = db_query.eq("category_id", category_id)
@@ -683,9 +686,10 @@ def search_stories(
     # Also search by teaser
     db_teaser_query = (
         supabase.table("story_texts")
-        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url")
+        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at")
         .eq("age_group_id", age_group_id)
         .eq("language_id", language_id)
+        .is_("owner_user_id", "null")
     )
     if category_id:
         db_teaser_query = db_teaser_query.eq("category_id", category_id)
@@ -1149,7 +1153,9 @@ def generate_custom_story(
         "category_id": category_id,
         "language_id": language_id,
         "generation_status": "full_generated",
-        "times_served": 0
+        "times_served": 0,
+        # Private: only the user who created this story can see it
+        "owner_user_id": user_id,
     }
     res = supabase.table("story_texts").insert(insert_payload).execute()
     if not res.data:
@@ -1441,7 +1447,9 @@ Return ONLY valid JSON: {"extracted_text": "..."}
         "category_id": category_id,
         "language_id": language_id,
         "generation_status": "full_generated",
-        "times_served": 0
+        "times_served": 0,
+        # Private: only the user who created this story can see it
+        "owner_user_id": user_id,
     }
     res = supabase.table("story_texts").insert(insert_payload).execute()
     if not res.data:

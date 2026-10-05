@@ -36,7 +36,7 @@ export default function CreateScreen({
   // PRO_TIER_TARGET_WORDS (Pro, ~5 min), and
   // voice_clone_service.CLONED_VOICE_CHAR_LIMIT (~3 min cloned narration).
   const narratorLengthText = isPro
-    ? "Your Pro plan narrates up to 5 minutes (~675 words) per story - longer files get trimmed to fit."
+    ? "Your Super plan narrates up to 5 minutes (~675 words) per story - longer files get trimmed to fit."
     : "Narrations run up to about 3 minutes (~405 words) per story - longer files get trimmed to fit.";
   const cloneLengthText = "Parent voice clones are limited to about 3 minutes (~2,400 characters) per story, regardless of file length.";
   const [selectedFile, setSelectedFile] = useState(null);
@@ -186,6 +186,11 @@ export default function CreateScreen({
       setError("Please select a file.");
       return;
     }
+    if (subscriptionTier === "normal_monthly") {
+      setError("Your Normal plan is for listening. Upgrade to Pro (₹151/month) to create 5 AI-narrated stories a month.");
+      if (onGoToUpgrade) onGoToUpgrade();
+      return;
+    }
     if (voiceSource === "clone" && !isPremium) {
       if (onGoToUpgrade) onGoToUpgrade();
       return;
@@ -300,196 +305,217 @@ export default function CreateScreen({
 
   const newStoryRemaining = usageInfo?.new_story_remaining ?? 10;
   const cloneRemaining = usageInfo?.voice_clone_remaining ?? 2;
+  const isLocked = subscriptionTier === "normal_monthly";
+  const voiceTileColors = ["#6d3b8e", "#2f6f8f", "#8f4a2f", "#2f8f6a", "#8f2f5a", "#4a4f9f"];
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.titleSerif}>Voice Studio</Text>
-        <TouchableOpacity style={styles.homeBtn} onPress={onGoToHome}>
-          <Image source={require("../../assets/images/fox.jpg")} style={styles.homeBtnImg} />
-        </TouchableOpacity>
-      </View>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={styles.title}>Create a story</Text>
+        <Text style={styles.subtitle}>Turn any PDF, TXT or DOCX into a bedtime story.</Text>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Limits Display */}
         <View style={styles.limitsRow}>
           <View style={styles.limitBadge}>
-            <Text style={styles.limitText}>🌟 {newStoryRemaining} AI Stories Left</Text>
+            <Text style={styles.limitText}>🌟 {newStoryRemaining} AI stories left</Text>
           </View>
           <View style={styles.limitBadge}>
-            <Text style={styles.limitText}>🎙️ {cloneRemaining} Voice Clones Left</Text>
+            <Text style={styles.limitText}>🎙️ {cloneRemaining} voice clones left</Text>
           </View>
         </View>
 
-        {/* Upload Area */}
-        <View style={styles.glassCard}>
-          <Text style={styles.cardTitle}>📄 Upload a PDF, TXT, or DOCX File</Text>
-          <TouchableOpacity style={styles.uploadBox} onPress={handlePickFile}>
-            {selectedFile ? (
-              <Text style={styles.uploadText}>✅ File: {selectedFile.name}</Text>
+        {isLocked && (
+          <View style={styles.lockBox}>
+            <Text style={styles.lockText}>
+              🔒 Your Normal plan is for listening. Creating AI-narrated stories is part of Pro.
+            </Text>
+            <TouchableOpacity style={styles.upsellBtn} onPress={onGoToUpgrade}>
+              <Text style={styles.upsellBtnText}>Upgrade to Pro (₹151/month)</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <View style={[isLocked && { opacity: 0.45 }]} pointerEvents={isLocked ? "none" : "auto"}>
+          {/* File */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>📄 Your file</Text>
+            <TouchableOpacity style={styles.uploadBox} onPress={handlePickFile}>
+              {selectedFile ? (
+                <Text style={styles.uploadTextOn} numberOfLines={2}>✅ {selectedFile.name}</Text>
+              ) : (
+                <Text style={styles.uploadText}>Tap to pick PDF / TXT / DOCX</Text>
+              )}
+            </TouchableOpacity>
+
+            {isPdfFile(selectedFile) ? (
+              <View style={styles.pdfRangeBox}>
+                <View style={styles.pdfModeToggle}>
+                  <TouchableOpacity
+                    style={[styles.pdfModeOpt, pdfReadMode === "normal" && styles.pdfModeOptActive]}
+                    onPress={() => setPdfReadMode("normal")}
+                  >
+                    <Text style={[styles.pdfModeText, pdfReadMode === "normal" && styles.pdfModeTextActive]}>
+                      Normal Read
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.pdfModeOpt, pdfReadMode === "range" && styles.pdfModeOptActive]}
+                    onPress={() => setPdfReadMode("range")}
+                  >
+                    <Text style={[styles.pdfModeText, pdfReadMode === "range" && styles.pdfModeTextActive]}>
+                      Page Range
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {pdfReadMode === "range" && (
+                  <View style={styles.pdfPageInputsRow}>
+                    <View style={styles.pdfPageInputWrap}>
+                      <Text style={styles.pdfPageInputLabel}>From page</Text>
+                      <TextInput
+                        style={styles.pdfPageInput}
+                        placeholder="1"
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        keyboardType="number-pad"
+                        value={pdfPageFrom}
+                        onChangeText={setPdfPageFrom}
+                      />
+                    </View>
+                    <Text style={styles.pdfPageInputDash}>—</Text>
+                    <View style={styles.pdfPageInputWrap}>
+                      <Text style={styles.pdfPageInputLabel}>To page</Text>
+                      <TextInput
+                        style={styles.pdfPageInput}
+                        placeholder="5"
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        keyboardType="number-pad"
+                        value={pdfPageTo}
+                        onChangeText={setPdfPageTo}
+                      />
+                    </View>
+                  </View>
+                )}
+                <Text style={styles.hintText}>
+                  Read the whole PDF, or pick just one chapter (e.g. pages 3–7).
+                </Text>
+              </View>
             ) : (
-              <Text style={styles.uploadText}>Tap to pick PDF/TXT/DOCX</Text>
+              <Text style={styles.hintText}>
+                For PDFs you can also read just a page range (e.g. pages 3–7) — pick a PDF to see it.
+              </Text>
             )}
-          </TouchableOpacity>
 
-          <Text style={styles.lengthHintText}>
-            ℹ️ For PDFs, you can read the whole file or pick a specific page range (e.g. pages 3-7) -
-            handy for a big storybook where you only want one chapter.
-          </Text>
+            <View style={styles.limitBox}>
+              <Text style={styles.limitBoxTitle}>⏱ Story length limit</Text>
+              <Text style={styles.limitBoxText}>
+                {voiceSource === "clone" ? cloneLengthText : narratorLengthText}
+              </Text>
+            </View>
+          </View>
 
-          {isPdfFile(selectedFile) && (
-            <View style={styles.pdfRangeBox}>
-              <View style={styles.pdfModeToggle}>
+          {/* Voice */}
+          <View style={styles.card}>
+            <View style={styles.voiceHeaderRow}>
+              <Text style={[styles.cardTitle, { marginBottom: 0 }]}>🎤 Voice</Text>
+              <View style={styles.voiceToggle}>
                 <TouchableOpacity
-                  style={[styles.pdfModeOpt, pdfReadMode === "normal" && styles.pdfModeOptActive]}
-                  onPress={() => setPdfReadMode("normal")}
+                  style={[styles.voiceToggleOpt, voiceSource === "narrator" && styles.voiceToggleOptActive]}
+                  onPress={() => setVoiceSource("narrator")}
                 >
-                  <Text style={[styles.pdfModeText, pdfReadMode === "normal" && styles.pdfModeTextActive]}>
-                    Normal Read
+                  <Text style={[styles.voiceToggleText, voiceSource === "narrator" && styles.voiceToggleTextActive]}>
+                    Narrator
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.pdfModeOpt, pdfReadMode === "range" && styles.pdfModeOptActive]}
-                  onPress={() => setPdfReadMode("range")}
+                  style={[styles.voiceToggleOpt, voiceSource === "clone" && styles.voiceToggleOptActive]}
+                  onPress={() => setVoiceSource("clone")}
                 >
-                  <Text style={[styles.pdfModeText, pdfReadMode === "range" && styles.pdfModeTextActive]}>
-                    Page Range
+                  <Text style={[styles.voiceToggleText, voiceSource === "clone" && styles.voiceToggleTextActive]}>
+                    My voice
                   </Text>
                 </TouchableOpacity>
               </View>
-
-              {pdfReadMode === "range" && (
-                <View style={styles.pdfPageInputsRow}>
-                  <View style={styles.pdfPageInputWrap}>
-                    <Text style={styles.pdfPageInputLabel}>From page</Text>
-                    <TextInput
-                      style={styles.pdfPageInput}
-                      placeholder="1"
-                      placeholderTextColor="rgba(255,255,255,0.4)"
-                      keyboardType="number-pad"
-                      value={pdfPageFrom}
-                      onChangeText={setPdfPageFrom}
-                    />
-                  </View>
-                  <Text style={styles.pdfPageInputDash}>—</Text>
-                  <View style={styles.pdfPageInputWrap}>
-                    <Text style={styles.pdfPageInputLabel}>To page</Text>
-                    <TextInput
-                      style={styles.pdfPageInput}
-                      placeholder="5"
-                      placeholderTextColor="rgba(255,255,255,0.4)"
-                      keyboardType="number-pad"
-                      value={pdfPageTo}
-                      onChangeText={setPdfPageTo}
-                    />
-                  </View>
-                </View>
-              )}
             </View>
-          )}
 
-          <Text style={styles.lengthHintText}>
-            ℹ️ {voiceSource === "clone" ? cloneLengthText : narratorLengthText}
-          </Text>
-        </View>
-
-        {/* Voice Source: pick a premade Narrator or one of your Voice Clones */}
-        <View style={styles.glassCard}>
-          <View style={styles.voiceHeaderRow}>
-            <Text style={[styles.cardTitle, { marginBottom: 0 }]}>🎤 Choose a Narrator</Text>
-            <View style={styles.voiceToggle}>
-              <TouchableOpacity
-                style={[styles.voiceToggleOpt, voiceSource === "narrator" && styles.voiceToggleOptActive]}
-                onPress={() => setVoiceSource("narrator")}
-              >
-                <Text style={[styles.voiceToggleText, voiceSource === "narrator" && styles.voiceToggleTextActive]}>
-                  Narrator
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.voiceToggleOpt, voiceSource === "clone" && styles.voiceToggleOptActive]}
-                onPress={() => setVoiceSource("clone")}
-              >
-                <Text style={[styles.voiceToggleText, voiceSource === "clone" && styles.voiceToggleTextActive]}>
-                  Clone
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {voiceSource === "narrator" ? (
-            <>
-              {narratorVoices.length > 0 && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.voiceScroll}>
-                  {narratorVoices.map(voice => (
-                    <View key={voice.id} style={styles.voiceItemWrapper}>
-                      <TouchableOpacity
-                        style={[styles.voiceItem, selectedVoiceId === voice.id && styles.voiceItemActive]}
-                        onPress={() => setSelectedVoiceId(voice.id)}
-                      >
-                        <Text style={styles.voiceIcon}>{voice.icon || "👤"}</Text>
-                        <Text style={[styles.voiceName, selectedVoiceId === voice.id && styles.voiceNameActive]}>{voice.name}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.previewBtn}
-                        onPress={() => handlePreviewVoice(voice)}
-                      >
-                        <Text style={styles.previewBtnText}>
-                          {previewingVoiceId === voice.id ? "⏸️" : "▶️"}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              )}
-              {accents.length > 0 && (
-                <>
-                  <Text style={styles.accentLabel}>Accent</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accentScroll}>
-                    {accents.map(accent => (
-                      <TouchableOpacity
-                        key={accent.id}
-                        style={[styles.accentChip, selectedAccentId === accent.id && styles.accentChipActive]}
-                        onPress={() => setSelectedAccentId(accent.id)}
-                      >
-                        <Text style={styles.accentChipIcon}>{accent.flag || "🌍"}</Text>
-                        <Text style={[styles.accentChipText, selectedAccentId === accent.id && styles.accentChipTextActive]}>
-                          {accent.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+            {voiceSource === "narrator" ? (
+              <>
+                {narratorVoices.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.voiceScroll}>
+                    {narratorVoices.map((voice, idx) => {
+                      const active = selectedVoiceId === voice.id;
+                      return (
+                        <View key={voice.id} style={styles.voiceItemWrapper}>
+                          <TouchableOpacity
+                            style={[
+                              styles.voiceTile,
+                              { backgroundColor: voiceTileColors[idx % voiceTileColors.length] },
+                              active && styles.voiceTileActive,
+                            ]}
+                            onPress={() => setSelectedVoiceId(voice.id)}
+                          >
+                            <Text style={styles.voiceIcon}>{voice.icon || "👤"}</Text>
+                          </TouchableOpacity>
+                          <Text style={[styles.voiceName, active && styles.voiceNameActive]} numberOfLines={1}>
+                            {voice.name}
+                          </Text>
+                          <TouchableOpacity style={styles.previewBtn} onPress={() => handlePreviewVoice(voice)}>
+                            <Text style={styles.previewBtnText}>
+                              {previewingVoiceId === voice.id ? "⏸️" : "▶️"}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
                   </ScrollView>
-                </>
-              )}
-            </>
-          ) : !isPremium ? (
-            <View style={styles.upsellBox}>
-              <Text style={styles.upsellText}>
-                🔒 Narrating in your own voice is a Pro feature.
-              </Text>
-              <TouchableOpacity style={styles.upsellBtn} onPress={onGoToUpgrade}>
-                <Text style={styles.upsellBtnText}>Upgrade to Pro (₹219/month)</Text>
-              </TouchableOpacity>
-            </View>
-          ) : voiceClones.length === 0 ? (
-            <Text style={styles.errorText}>You don't have any voice clones. Add one in Settings.</Text>
-          ) : (
+                )}
+                {accents.length > 0 && (
+                  <>
+                    <Text style={styles.accentLabel}>Accent</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accentScroll}>
+                      {accents.map((accent) => (
+                        <TouchableOpacity
+                          key={accent.id}
+                          style={[styles.accentChip, selectedAccentId === accent.id && styles.accentChipActive]}
+                          onPress={() => setSelectedAccentId(accent.id)}
+                        >
+                          <Text style={styles.accentChipIcon}>{accent.flag || "🌍"}</Text>
+                          <Text style={[styles.accentChipText, selectedAccentId === accent.id && styles.accentChipTextActive]}>
+                            {accent.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+              </>
+            ) : !isPremium ? (
+              <View style={styles.upsellBox}>
+                <Text style={styles.upsellText}>🔒 Narrating in your own voice is a Super feature.</Text>
+                <TouchableOpacity style={styles.upsellBtn} onPress={onGoToUpgrade}>
+                  <Text style={styles.upsellBtnText}>Upgrade to Super (₹219/month)</Text>
+                </TouchableOpacity>
+              </View>
+            ) : voiceClones.length === 0 ? (
+              <Text style={styles.errorText}>You don't have any voice clones. Add one in Settings.</Text>
+            ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.voiceScroll}>
-                {voiceClones.map(clone => {
+                {voiceClones.map((clone, idx) => {
                   const isActive = (selectedCloneId || voiceClones[0]?.id) === clone.id;
                   return (
                     <View key={clone.id} style={styles.voiceItemWrapper}>
                       <TouchableOpacity
-                        style={[styles.voiceItem, isActive && styles.voiceItemActive]}
+                        style={[
+                          styles.voiceTile,
+                          { backgroundColor: voiceTileColors[idx % voiceTileColors.length] },
+                          isActive && styles.voiceTileActive,
+                        ]}
                         onPress={() => setSelectedCloneId(clone.id)}
                       >
                         <Text style={styles.voiceIcon}>👤</Text>
-                        <Text style={[styles.voiceName, isActive && styles.voiceNameActive]}>{clone.display_name || "Clone"}</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.previewBtn}
-                        onPress={() => handlePreviewClone(clone)}
-                      >
+                      <Text style={[styles.voiceName, isActive && styles.voiceNameActive]} numberOfLines={1}>
+                        {clone.display_name || "Clone"}
+                      </Text>
+                      <TouchableOpacity style={styles.previewBtn} onPress={() => handlePreviewClone(clone)}>
                         <Text style={styles.previewBtnText}>
                           {previewingCloneId === clone.id ? "⏸️" : "▶️"}
                         </Text>
@@ -499,19 +525,20 @@ export default function CreateScreen({
                 })}
               </ScrollView>
             )}
+          </View>
         </View>
 
         {error && <Text style={styles.errorText}>{error}</Text>}
 
         <TouchableOpacity
-          style={[styles.generateBtn, generating && {opacity: 0.7}]}
+          style={[styles.generateBtn, (generating || isLocked) && { opacity: 0.6 }]}
           onPress={handleGenerate}
           disabled={generating}
         >
           {generating ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color="#1a1230" />
           ) : (
-            <Text style={styles.generateBtnText}>✨ Generate Story</Text>
+            <Text style={styles.generateBtnText}>✨ Create story</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -528,148 +555,60 @@ export default function CreateScreen({
   );
 }
 
+const GOLD = "#f5a623";
+const CARD = "#14151d";
+const LINE = "rgba(255,255,255,0.08)";
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "transparent",
-    paddingTop: 40,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    marginBottom: 20,
-  },
-  titleSerif: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#ffffff",
-    fontFamily: "serif",
-  },
-  homeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-    overflow: "hidden",
-  },
-  homeBtnImg: {
-    width: "100%",
-    height: "100%",
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingBottom: 120,
-  },
-  limitsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 20,
-  },
+  container: { flex: 1, backgroundColor: "#05060c" },
+  content: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 140 },
+  title: { color: "#fff", fontSize: 24, fontWeight: "800" },
+  subtitle: { color: "#8f94ab", fontSize: 13, marginTop: 4, marginBottom: 14 },
+  limitsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
   limitBadge: {
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: CARD,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: LINE,
   },
-  limitText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  glassCard: {
-    backgroundColor: "rgba(15, 20, 45, 0.7)",
+  limitText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  card: {
+    backgroundColor: CARD,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 20,
+    borderColor: LINE,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14,
   },
-  cardTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 15,
-  },
-  textArea: {
-    backgroundColor: "rgba(0,0,0,0.3)",
-    borderRadius: 16,
-    padding: 15,
-    color: "#fff",
-    height: 100,
-    textAlignVertical: "top",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-  },
+  cardTitle: { color: "#fff", fontSize: 15, fontWeight: "700", marginBottom: 12 },
   uploadBox: {
-    backgroundColor: "rgba(0,0,0,0.3)",
-    borderRadius: 16,
-    padding: 30,
+    backgroundColor: "#0b0c12",
+    borderRadius: 14,
+    paddingVertical: 26,
+    paddingHorizontal: 14,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.18)",
     borderStyle: "dashed",
   },
-  uploadText: {
-    color: "#9ba1ba",
-    fontWeight: "600",
-  },
-  lengthHintText: {
-    color: "#ffffff",
-    fontWeight: "700",
-    fontSize: 11.5,
-    lineHeight: 16,
-    marginTop: 10,
-  },
-  pdfRangeBox: {
-    marginTop: 14,
-  },
-  pdfModeToggle: {
-    flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.45)",
-    borderRadius: 14,
-    padding: 4,
-  },
-  pdfModeOpt: {
-    flex: 1,
-    paddingVertical: 9,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  pdfModeOptActive: {
-    backgroundColor: "rgba(245, 166, 35, 0.25)",
-  },
-  pdfModeText: {
-    color: "#9ba1ba",
-    fontSize: 12.5,
-    fontWeight: "700",
-  },
-  pdfModeTextActive: {
-    color: "#f5a623",
-  },
-  pdfPageInputsRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 10,
-    marginTop: 12,
-  },
-  pdfPageInputWrap: {
-    flex: 1,
-  },
-  pdfPageInputLabel: {
-    color: "#9ba1ba",
-    fontSize: 11,
-    fontWeight: "600",
-    marginBottom: 6,
-  },
+  uploadText: { color: "#9ba1ba", fontWeight: "600" },
+  uploadTextOn: { color: GOLD, fontWeight: "700", textAlign: "center" },
+  hintText: { color: "#8f94ab", fontSize: 12, lineHeight: 17, marginTop: 10 },
+  pdfRangeBox: { marginTop: 14 },
+  pdfModeToggle: { flexDirection: "row", backgroundColor: "#0b0c12", borderRadius: 14, padding: 4 },
+  pdfModeOpt: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: "center" },
+  pdfModeOptActive: { backgroundColor: GOLD },
+  pdfModeText: { color: "#9ba1ba", fontSize: 12.5, fontWeight: "700" },
+  pdfModeTextActive: { color: "#1a1230" },
+  pdfPageInputsRow: { flexDirection: "row", alignItems: "flex-end", gap: 10, marginTop: 12 },
+  pdfPageInputWrap: { flex: 1 },
+  pdfPageInputLabel: { color: "#9ba1ba", fontSize: 11, fontWeight: "600", marginBottom: 6 },
   pdfPageInput: {
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: "#0b0c12",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: LINE,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -677,89 +616,63 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
   },
-  pdfPageInputDash: {
-    color: "#9ba1ba",
-    fontSize: 16,
-    marginBottom: 10,
+  pdfPageInputDash: { color: "#9ba1ba", fontSize: 16, marginBottom: 10 },
+  limitBox: {
+    marginTop: 14,
+    backgroundColor: "rgba(245,166,35,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(245,166,35,0.35)",
+    borderRadius: 12,
+    padding: 12,
   },
+  limitBoxTitle: { color: GOLD, fontSize: 12.5, fontWeight: "800", marginBottom: 4 },
+  limitBoxText: { color: "#fff", fontSize: 12.5, lineHeight: 18, fontWeight: "600" },
   voiceHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 14,
   },
-  voiceToggle: {
-    flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.45)",
-    borderRadius: 12,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  voiceToggleOpt: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9,
-  },
-  voiceToggleOptActive: {
-    backgroundColor: "#f5a623",
-  },
-  voiceToggleText: {
-    color: "#9ba1ba",
-    fontWeight: "700",
-    fontSize: 12,
-  },
-  voiceToggleTextActive: {
-    color: "#1a1230",
-  },
-  voiceScroll: {
-    flexDirection: "row",
-  },
-  voiceItemWrapper: {
+  voiceToggle: { flexDirection: "row", backgroundColor: "#0b0c12", borderRadius: 12, padding: 3 },
+  voiceToggleOpt: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9 },
+  voiceToggleOptActive: { backgroundColor: GOLD },
+  voiceToggleText: { color: "#9ba1ba", fontWeight: "700", fontSize: 12 },
+  voiceToggleTextActive: { color: "#1a1230" },
+  voiceScroll: { flexDirection: "row" },
+  voiceItemWrapper: { alignItems: "center", marginRight: 14, width: 72 },
+  voiceTile: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
     alignItems: "center",
-    marginRight: 20,
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+    opacity: 0.75,
   },
-  voiceItem: {
-    alignItems: "center",
-    opacity: 0.5,
-    marginBottom: 8,
-  },
-  voiceItemActive: {
-    opacity: 1,
-  },
-  voiceIcon: {
-    fontSize: 30,
-    marginBottom: 5,
-  },
-  voiceName: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  voiceNameActive: {
-    color: "#f5a623",
-  },
+  voiceTileActive: { borderColor: GOLD, opacity: 1 },
+  voiceIcon: { fontSize: 28 },
+  voiceName: { color: "#cfd3e4", fontWeight: "600", fontSize: 12, marginTop: 6, marginBottom: 6 },
+  voiceNameActive: { color: GOLD },
   previewBtn: {
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "#0b0c12",
     borderRadius: 12,
-    padding: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: LINE,
   },
-  previewBtnText: {
-    fontSize: 12,
-  },
+  previewBtnText: { fontSize: 12 },
   accentLabel: {
     color: "#9ba1ba",
     fontSize: 11,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginTop: 12,
+    marginTop: 14,
     marginBottom: 8,
   },
-  accentScroll: {
-    flexDirection: "row",
-  },
+  accentScroll: { flexDirection: "row" },
   accentChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -767,66 +680,36 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "#0b0c12",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: LINE,
     marginRight: 10,
   },
-  accentChipActive: {
-    backgroundColor: "rgba(245, 166, 35, 0.2)",
-    borderColor: "rgba(245, 166, 35, 0.5)",
-  },
-  accentChipIcon: {
-    fontSize: 14,
-  },
-  accentChipText: {
-    color: "#d0d4e3",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  accentChipTextActive: {
-    color: "#f5a623",
-  },
+  accentChipActive: { backgroundColor: GOLD, borderColor: GOLD },
+  accentChipIcon: { fontSize: 14 },
+  accentChipText: { color: "#d0d4e3", fontSize: 12, fontWeight: "600" },
+  accentChipTextActive: { color: "#1a1230", fontWeight: "800" },
   generateBtn: {
-    backgroundColor: "#f5a623",
-    paddingVertical: 18,
+    backgroundColor: GOLD,
+    paddingVertical: 16,
     borderRadius: 30,
     alignItems: "center",
-    shadowColor: "#f5a623",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
+    marginTop: 4,
   },
-  generateBtnText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  errorText: {
-    color: "#ff4d4f",
-    marginBottom: 15,
-    textAlign: "center",
-    fontWeight: "600",
-  },
-  upsellBox: {
+  generateBtnText: { color: "#1a1230", fontSize: 17, fontWeight: "800" },
+  errorText: { color: "#ff6b6d", marginBottom: 12, textAlign: "center", fontWeight: "600" },
+  lockBox: {
+    backgroundColor: "rgba(245,166,35,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(245,166,35,0.35)",
+    borderRadius: 16,
+    padding: 14,
     alignItems: "center",
-    paddingVertical: 10,
+    marginBottom: 14,
   },
-  upsellText: {
-    color: "#9ba1ba",
-    fontWeight: "600",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  upsellBtn: {
-    backgroundColor: "#f5a623",
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  upsellBtnText: {
-    color: "#1a1230",
-    fontWeight: "800",
-    fontSize: 13,
-  },
+  lockText: { color: "#fff", fontWeight: "600", textAlign: "center", marginBottom: 12, lineHeight: 19 },
+  upsellBox: { alignItems: "center", paddingVertical: 10 },
+  upsellText: { color: "#9ba1ba", fontWeight: "600", marginBottom: 12, textAlign: "center" },
+  upsellBtn: { backgroundColor: GOLD, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20 },
+  upsellBtnText: { color: "#1a1230", fontWeight: "800", fontSize: 13 },
 });

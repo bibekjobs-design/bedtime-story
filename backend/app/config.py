@@ -28,8 +28,13 @@ class Settings(BaseSettings):
     # TEST-mode plans (Normal Rs 99/month, Pro Rs 219/month). When you switch
     # to live keys, create the same two plans in LIVE mode and set these two
     # variables on the server to the live plan IDs.
+    # Normal = Rs 99, Pro = Rs 151 (new), Super = Rs 219 (the old "Pro").
+    # NOTE: the variable called RAZORPAY_PLAN_ID_PRO below is the Rs 219 SUPER
+    # plan (name kept so existing server settings keep working);
+    # RAZORPAY_PLAN_ID_PRO151 is the new Rs 151 Pro plan.
     RAZORPAY_PLAN_ID_NORMAL: str = "plan_Tig3YXLHIzXYSn"
     RAZORPAY_PLAN_ID_PRO: str = "plan_Tig4n02bWl8xML"
+    RAZORPAY_PLAN_ID_PRO151: str = "plan_TkJL8NacDgCKLt"
 
     # JWT Auth
     JWT_SECRET_KEY: str = "change-this-to-a-long-random-secret-in-production"

@@ -68,7 +68,7 @@ async def upload_voice_clone(
     if not is_admin and tier not in ("premium", "premium_monthly", "premium_annual"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Voice cloning is a Pro feature. Upgrade to the ₹219/month Pro plan to clone your voice for bedtime stories!"
+            detail="Voice cloning is a Super feature. Upgrade to the ₹219/month Super plan to clone your voice for bedtime stories!"
         )
 
     audio_bytes = await audio_file.read()
@@ -113,7 +113,7 @@ async def narrate_cloned(
     if not is_admin and tier not in ("premium", "premium_monthly", "premium_annual"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Parent voice clone narration is a Pro feature. Upgrade to the ₹219/month Pro plan to narrate stories in your voice!"
+            detail="Parent voice clone narration is a Super feature. Upgrade to the ₹219/month Super plan to narrate stories in your voice!"
         )
 
     try:

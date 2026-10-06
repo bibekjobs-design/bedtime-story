@@ -88,8 +88,14 @@ const AMBIENT_SOUNDSCAPES = [
   },
 ];
 
-export default function PlayerScreen({ story, onBack }) {
+export default function PlayerScreen({ story, onBack, onSwitchLanguage }) {
   const [coverBroken, setCoverBroken] = useState(false);
+
+  // Language versions (admin can publish one story in several languages).
+  // Offline downloads are kept per language so Hindi never plays the English file.
+  const langSuffix = story.language_code ? `_${story.language_code}` : "";
+  const [availableLangs, setAvailableLangs] = useState([]);
+  const [switchingLang, setSwitchingLang] = useState(false);
   const hasCover =
     !coverBroken && typeof story.cover_image_url === "string" && story.cover_image_url.startsWith("http");
   // Voice Narration Audio State
@@ -197,6 +203,30 @@ export default function PlayerScreen({ story, onBack }) {
   }
 
   useEffect(() => {
+    const sid = story.story_text_id || story.id;
+    if (sid && !isClonedStory) {
+      api
+        .getStoryLanguages(sid)
+        .then((res) => setAvailableLangs((res && res.languages) || []))
+        .catch(() => {});
+    }
+  }, []);
+
+  async function handleSwitchLanguage(code) {
+    const current = story.language_code || (availableLangs[0] && availableLangs[0].code);
+    if (switchingLang || code === current) return;
+    setSwitchingLang(true);
+    try {
+      const sid = story.story_text_id || story.id;
+      const res = await api.commitStory(sid, "standard", "luna", "us", code);
+      if (onSwitchLanguage) onSwitchLanguage({ ...story, ...res, language_code: code });
+    } catch (e) {
+      Alert.alert("Language", e.message || "Couldn't switch language. Please try again.");
+      setSwitchingLang(false);
+    }
+  }
+
+  useEffect(() => {
     setupAudioAndAmbient();
     checkOfflineStatus();
     checkFavoriteStatus();
@@ -242,7 +272,7 @@ export default function PlayerScreen({ story, onBack }) {
 
   async function checkOfflineStatus() {
     try {
-      const localUri = await AsyncStorage.getItem(`offline_${story.story_text_id}`);
+      const localUri = await AsyncStorage.getItem(`offline_${story.story_text_id}${langSuffix}`);
       if (localUri) {
         const fileInfo = await FileSystem.getInfoAsync(localUri);
         if (fileInfo.exists) {
@@ -262,7 +292,7 @@ export default function PlayerScreen({ story, onBack }) {
       });
 
       // 1. Setup Voice Narration (Track 1)
-      const localUri = await AsyncStorage.getItem(`offline_${story.story_text_id}`);
+      const localUri = await AsyncStorage.getItem(`offline_${story.story_text_id}${langSuffix}`);
       const audioSource = localUri ? { uri: localUri } : { uri: story.audio_url };
 
       const { sound: newSound } = await SafeAudio.Sound.createAsync(
@@ -420,11 +450,11 @@ export default function PlayerScreen({ story, onBack }) {
         await FileSystem.makeDirectoryAsync(targetDir, { intermediates: true });
       }
 
-      const fileUri = `${targetDir}${story.story_text_id}.mp3`;
+      const fileUri = `${targetDir}${story.story_text_id}${langSuffix}.mp3`;
       const downloadRes = await FileSystem.downloadAsync(story.audio_url, fileUri);
 
       if (downloadRes.status === 200) {
-        await AsyncStorage.setItem(`offline_${story.story_text_id}`, fileUri);
+        await AsyncStorage.setItem(`offline_${story.story_text_id}${langSuffix}`, fileUri);
         setIsDownloaded(true);
         Alert.alert("Downloaded! 🌙", "Story saved for offline listening anywhere.");
       }
@@ -512,6 +542,24 @@ export default function PlayerScreen({ story, onBack }) {
           <Text style={styles.title}>{story.title}</Text>
           {!isClonedStory && story.teaser ? (
             <Text style={styles.teaser}>{story.teaser}</Text>
+          ) : null}
+          {availableLangs.length > 1 ? (
+            <View style={styles.langRow}>
+              {availableLangs.map((l) => {
+                const active = (story.language_code || availableLangs[0].code) === l.code;
+                return (
+                  <TouchableOpacity
+                    key={l.code}
+                    style={[styles.langChip, active && styles.langChipActive]}
+                    onPress={() => handleSwitchLanguage(l.code)}
+                    disabled={switchingLang}
+                  >
+                    <Text style={[styles.langChipText, active && styles.langChipTextActive]}>{l.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {switchingLang ? <ActivityIndicator size="small" color="#f5a623" style={{ marginLeft: 6 }} /> : null}
+            </View>
           ) : null}
         </View>
 
@@ -887,6 +935,18 @@ const styles = StyleSheet.create({
     fontSize: 20,
     letterSpacing: 4,
   },
+  langRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 12 },
+  langChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  langChipActive: { backgroundColor: "#f5a623", borderColor: "#f5a623" },
+  langChipText: { color: "#d0d4e3", fontSize: 12.5, fontWeight: "700" },
+  langChipTextActive: { color: "#1a1230", fontWeight: "800" },
   storyDetails: {
     width: "100%",
     alignItems: "center",

@@ -17,6 +17,7 @@ import { colors } from "../theme/colors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import SafeAudio from "../utils/safeAudio";
 import StoryLoadingOverlay from "../components/StoryLoadingOverlay";
+import LanguagePicker, { languageByCode } from "../components/LanguagePicker";
 
 export default function CreateScreen({
   activeProfile,
@@ -35,9 +36,13 @@ export default function CreateScreen({
   // NORMAL_TIER_TARGET_WORDS (free trial + Normal, ~3 min) vs
   // PRO_TIER_TARGET_WORDS (Pro, ~5 min), and
   // voice_clone_service.CLONED_VOICE_CHAR_LIMIT (~3 min cloned narration).
+  const [languageCode, setLanguageCode] = useState("en"); // en | hi | bn | kn | te
+  const langInfo = languageByCode(languageCode);
+  const baseWords = isPro ? 675 : 405;
+  const shownWords = Math.round((baseWords * langInfo.wordFactor) / 5) * 5;
   const narratorLengthText = isPro
-    ? "Your Super plan narrates up to 5 minutes (~675 words) per story - longer files get trimmed to fit."
-    : "Narrations run up to about 3 minutes (~405 words) per story - longer files get trimmed to fit.";
+    ? `Your Super plan narrates up to 5 minutes (~${shownWords} words) per story - longer files get trimmed to fit.`
+    : `Narrations run up to about 3 minutes (~${shownWords} words) per story - longer files get trimmed to fit.`;
   const cloneLengthText = "Parent voice clones are limited to about 3 minutes (~2,400 characters) per story, regardless of file length.";
   const [selectedFile, setSelectedFile] = useState(null);
 
@@ -225,6 +230,7 @@ export default function CreateScreen({
       formData.append("age_group_id", activeProfile?.age_group_id || 1);
       formData.append("voice_id", selectedVoiceId);
       formData.append("accent_id", selectedAccentId);
+      formData.append("language_code", voiceSource === "clone" ? "en" : languageCode);
       if (usingPageRange) {
         formData.append("pdf_page_from", String(pageFromNum));
         formData.append("pdf_page_to", String(pageToNum));
@@ -438,6 +444,13 @@ export default function CreateScreen({
 
             {voiceSource === "narrator" ? (
               <>
+                <Text style={styles.accentLabel}>Story language</Text>
+                <LanguagePicker value={languageCode} onChange={setLanguageCode} style={{ marginBottom: 14 }} />
+                {languageCode !== "en" && (
+                  <Text style={styles.hintText}>
+                    Any file is translated into {langInfo.label} first, then narrated.
+                  </Text>
+                )}
                 {narratorVoices.length > 0 && (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.voiceScroll}>
                     {narratorVoices.map((voice, idx) => {
@@ -467,7 +480,7 @@ export default function CreateScreen({
                     })}
                   </ScrollView>
                 )}
-                {accents.length > 0 && (
+                {languageCode === "en" && accents.length > 0 && (
                   <>
                     <Text style={styles.accentLabel}>Accent</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accentScroll}>

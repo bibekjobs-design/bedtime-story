@@ -114,21 +114,19 @@ export default function LoginScreen({
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <TouchableOpacity style={styles.backButton} onPress={onBack}>
-        <Text style={styles.backText}>← Browse Stories as Guest</Text>
-      </TouchableOpacity>
-
-      {/* Hero illustration */}
+      {/* S logo + title (look only) */}
       <View style={styles.hero}>
-        <Text style={styles.heroEmoji}>🦊📖</Text>
+        <Text style={styles.logoS}>S</Text>
       </View>
 
       <View style={styles.sheet}>
-        <Text style={styles.sheetTitle}>Dream Weaver</Text>
+        <Text style={styles.sheetTitle}>
+          {activeTab === "login" ? "Welcome back" : "Create your account"}
+        </Text>
         <Text style={styles.sheetSubtitle}>
           {activeTab === "login"
-            ? "Sign in to access your child's personalized bedtime stories and voice clones."
-            : "Sign up to access personalized stories, multiple child profiles, and offline bedtime playback."}
+            ? "Log in to continue your stories"
+            : "Start your bedtime story journey"}
         </Text>
 
         {/* Tab switcher */}
@@ -154,7 +152,7 @@ export default function LoginScreen({
               <TextInput
                 style={[styles.input, emailFocused && styles.inputFocused]}
                 placeholder="parent@example.com"
-                placeholderTextColor={colors.textDim}
+                placeholderTextColor="#6b6e80"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -175,7 +173,7 @@ export default function LoginScreen({
                 <TextInput
                   style={styles.passwordInput}
                   placeholder="Your password"
-                  placeholderTextColor={colors.textDim}
+                  placeholderTextColor="#6b6e80"
                   secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
@@ -186,7 +184,7 @@ export default function LoginScreen({
                   style={styles.eyeBtn}
                   onPress={() => setShowPassword(!showPassword)}
                 >
-                  <Text style={styles.eyeIcon}>{showPassword ? "👁️" : "🙈"}</Text>
+                  <Text style={styles.eyeIcon}>{showPassword ? "HIDE" : "SHOW"}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -224,7 +222,7 @@ export default function LoginScreen({
               <TextInput
                 style={styles.input}
                 placeholder="Jane Doe"
-                placeholderTextColor={colors.textDim}
+                placeholderTextColor="#6b6e80"
                 value={fullName}
                 onChangeText={setFullName}
               />
@@ -235,7 +233,7 @@ export default function LoginScreen({
               <TextInput
                 style={styles.input}
                 placeholder="parent@example.com"
-                placeholderTextColor={colors.textDim}
+                placeholderTextColor="#6b6e80"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={regEmail}
@@ -248,7 +246,7 @@ export default function LoginScreen({
               <TextInput
                 style={styles.input}
                 placeholder="9876543210"
-                placeholderTextColor={colors.textDim}
+                placeholderTextColor="#6b6e80"
                 keyboardType="phone-pad"
                 value={mobileNumber}
                 onChangeText={setMobileNumber}
@@ -261,7 +259,7 @@ export default function LoginScreen({
                 <TextInput
                   style={styles.passwordInput}
                   placeholder="Create strong password"
-                  placeholderTextColor={colors.textDim}
+                  placeholderTextColor="#6b6e80"
                   secureTextEntry={!showRegPassword}
                   value={regPassword}
                   onChangeText={setRegPassword}
@@ -270,7 +268,7 @@ export default function LoginScreen({
                   style={styles.eyeBtn}
                   onPress={() => setShowRegPassword(!showRegPassword)}
                 >
-                  <Text style={styles.eyeIcon}>{showRegPassword ? "👁️" : "🙈"}</Text>
+                  <Text style={styles.eyeIcon}>{showRegPassword ? "HIDE" : "SHOW"}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -281,7 +279,7 @@ export default function LoginScreen({
                 <TextInput
                   style={styles.passwordInput}
                   placeholder="Repeat password"
-                  placeholderTextColor={colors.textDim}
+                  placeholderTextColor="#6b6e80"
                   secureTextEntry={!showConfirmPassword}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
@@ -290,7 +288,7 @@ export default function LoginScreen({
                   style={styles.eyeBtn}
                   onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                 >
-                  <Text style={styles.eyeIcon}>{showConfirmPassword ? "👁️" : "🙈"}</Text>
+                  <Text style={styles.eyeIcon}>{showConfirmPassword ? "HIDE" : "SHOW"}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -356,89 +354,65 @@ export default function LoginScreen({
   );
 }
 
+const RED = "#e50914";
+const GOLD = "#f5a623";
+const LINE = "rgba(255,255,255,0.14)";
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "transparent",
+    backgroundColor: "#000",
   },
   content: {
-    padding: 24,
-    paddingTop: 54,
+    padding: 28,
+    paddingTop: 64,
     paddingBottom: 40,
   },
-  backButton: {
-    alignSelf: "flex-start",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: "rgba(22, 29, 54, 0.6)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
-    marginBottom: 24,
-  },
-  backText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
   hero: {
-    height: 120,
-    borderRadius: 22,
-    backgroundColor: "rgba(26, 20, 64, 0.55)",
-    borderWidth: 1,
-    borderColor: "rgba(147, 51, 234, 0.25)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: -18,
+    alignItems: "flex-start",
+    marginBottom: 14,
   },
-  heroEmoji: {
-    fontSize: 40,
+  logoS: {
+    color: RED,
+    fontSize: 64,
+    lineHeight: 70,
+    fontWeight: "900",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
   },
-
-  sheet: {
-    backgroundColor: "rgba(11, 14, 32, 0.85)",
-    borderRadius: 24,
-    paddingTop: 26,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderWidth: 1,
-    borderColor: "rgba(147, 51, 234, 0.22)",
-  },
+  sheet: {},
   sheetTitle: {
-    color: colors.text,
-    fontSize: 22,
+    color: "#fff",
+    fontSize: 26,
     fontWeight: "800",
-    textAlign: "center",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   sheetSubtitle: {
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: "center",
-    marginBottom: 18,
+    color: "#9a9db0",
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 22,
   },
 
   tabsRow: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: LINE,
+    marginBottom: 24,
   },
   tabBtn: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 11,
+    paddingVertical: 12,
     alignItems: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+    marginBottom: -1,
   },
   tabBtnActive: {
-    backgroundColor: colors.primary,
+    borderBottomColor: RED,
   },
   tabText: {
-    color: colors.textMuted,
-    fontSize: 13,
+    color: "#8d90a0",
+    fontSize: 14,
     fontWeight: "700",
   },
   tabTextActive: {
@@ -447,79 +421,79 @@ const styles = StyleSheet.create({
 
   form: {},
   inputGroup: {
-    marginBottom: 18,
+    marginBottom: 20,
   },
   label: {
-    color: colors.textMuted,
-    fontSize: 13,
+    color: "#9a9db0",
+    fontSize: 12,
     fontWeight: "600",
-    marginBottom: 8,
+    marginBottom: 4,
   },
   labelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 4,
   },
   forgotLink: {
-    color: colors.sliderThumb,
-    fontSize: 12,
-    fontWeight: "600",
+    color: GOLD,
+    fontSize: 13,
+    fontWeight: "700",
   },
   input: {
-    backgroundColor: "rgba(22, 29, 54, 0.85)",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: colors.text,
-    fontSize: 14,
+    backgroundColor: "transparent",
+    borderBottomWidth: 1,
+    borderBottomColor: LINE,
+    paddingHorizontal: 0,
+    paddingVertical: 10,
+    color: "#fff",
+    fontSize: 16,
   },
   inputFocused: {
-    borderColor: colors.primaryLight,
-    backgroundColor: "rgba(30, 24, 64, 0.9)",
+    borderBottomColor: RED,
   },
   passwordContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(22, 29, 54, 0.85)",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderBottomWidth: 1,
+    borderBottomColor: LINE,
   },
   passwordInput: {
     flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: colors.text,
-    fontSize: 14,
+    paddingHorizontal: 0,
+    paddingVertical: 10,
+    color: "#fff",
+    fontSize: 16,
   },
   eyeBtn: {
-    paddingHorizontal: 12,
+    paddingLeft: 12,
+    paddingVertical: 8,
   },
   eyeIcon: {
-    fontSize: 16,
+    color: GOLD,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.8,
   },
   checkboxRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    marginBottom: 18,
+    marginBottom: 20,
   },
   checkbox: {
     width: 22,
     height: 22,
-    borderRadius: 6,
+    borderRadius: 4,
     borderWidth: 2,
-    borderColor: colors.textDim,
+    borderColor: "#6b6e80",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 2,
   },
   checkboxChecked: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: RED,
+    borderColor: RED,
   },
   checkmark: {
     color: "#fff",
@@ -528,22 +502,22 @@ const styles = StyleSheet.create({
   },
   checkboxLabel: {
     flex: 1,
-    color: colors.textMuted,
+    color: "#9a9db0",
     fontSize: 13,
     lineHeight: 18,
   },
   submitBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    paddingVertical: 14,
+    backgroundColor: RED,
+    borderRadius: 8,
+    paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 8,
-    marginBottom: 16,
+    marginBottom: 18,
   },
   submitText: {
     color: "#fff",
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "800",
   },
   footerRow: {
@@ -552,12 +526,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   footerText: {
-    color: colors.textDim,
-    fontSize: 13,
+    color: "#8d90a0",
+    fontSize: 14,
   },
   signUpLink: {
-    color: colors.sliderThumb,
-    fontSize: 13,
+    color: "#fff",
+    fontSize: 14,
     fontWeight: "700",
   },
   errorBox: {
@@ -565,8 +539,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(239, 68, 68, 0.3)",
     padding: 12,
-    borderRadius: 12,
-    marginBottom: 14,
+    borderRadius: 8,
+    marginBottom: 16,
   },
   errorText: {
     color: "#f87171",
@@ -576,7 +550,7 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
@@ -584,25 +558,25 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "100%",
     maxWidth: 340,
-    backgroundColor: "rgba(15, 20, 45, 0.95)",
-    borderRadius: 24,
+    backgroundColor: "#14151d",
+    borderRadius: 18,
     padding: 28,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: LINE,
   },
   modalEmoji: {
     fontSize: 48,
     marginBottom: 14,
   },
   modalTitle: {
-    color: colors.text,
+    color: "#fff",
     fontSize: 22,
     fontWeight: "800",
     marginBottom: 8,
   },
   modalSubtitle: {
-    color: colors.textMuted,
+    color: "#9a9db0",
     fontSize: 14,
     textAlign: "center",
     lineHeight: 20,
@@ -610,9 +584,9 @@ const styles = StyleSheet.create({
   },
   modalProceedBtn: {
     width: "100%",
-    backgroundColor: colors.primary,
+    backgroundColor: RED,
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 8,
     alignItems: "center",
   },
   modalProceedText: {

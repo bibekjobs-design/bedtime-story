@@ -147,7 +147,7 @@ def enforce_story_length(
     search_from = len(" ".join(words[:target_words]))
 
     best_cut = -1
-    for m in re.finditer(r'[.!?]["\')]?\s', window_text[search_from:]):
+    for m in re.finditer(r'[.!?।॥]["\')]?\s', window_text[search_from:]):
         best_cut = search_from + m.end()
 
     if best_cut > 0:
@@ -159,6 +159,110 @@ def enforce_story_length(
             final_text += "..."
 
     return final_text, True
+
+
+# ---------------------------------------------------------------------------
+# Multi-language support (English + Indian languages)
+# ---------------------------------------------------------------------------
+TRANSLATION_SUFFIXES = ("hi", "bn", "kn", "te", "or")  # "or" kept so old Odia rows are still recognised
+
+SUPPORTED_LANGUAGES = {
+    "en": {"label": "English", "script": [(0x0041, 0x024F)], "word_factor": 1.0},
+    "hi": {"label": "Hindi", "script": [(0x0900, 0x097F)], "word_factor": 1.0},
+    "bn": {"label": "Bengali", "script": [(0x0980, 0x09FF)], "word_factor": 0.9},
+    "kn": {"label": "Kannada", "script": [(0x0C80, 0x0CFF)], "word_factor": 0.8},
+    "te": {"label": "Telugu", "script": [(0x0C00, 0x0C7F)], "word_factor": 0.85},
+}
+
+
+def target_words_for_language(subscription_tier: str, lang_code: str) -> int:
+    """Plan word cap, scaled for languages whose words take longer to speak."""
+    base = target_words_for_tier(subscription_tier)
+    factor = SUPPORTED_LANGUAGES.get((lang_code or "en").lower(), {}).get("word_factor", 1.0)
+    return max(60, int(base * factor))
+
+
+def _script_ratio(text: str, ranges) -> float:
+    letters = [ch for ch in (text or "") if ch.isalpha()]
+    if not letters:
+        return 1.0  # nothing to translate (numbers/punctuation only)
+    hits = sum(1 for ch in letters if any(lo <= ord(ch) <= hi for lo, hi in ranges))
+    return hits / len(letters)
+
+
+def ensure_text_in_language(text: str, lang_code: str, lang_label: str) -> tuple[str, bool]:
+    """
+    Returns (text_in_target_language, was_translated). If the text is already
+    mostly written in the target language's script it is returned untouched
+    (no Gemini call). Otherwise Gemini translates it. Never silently falls
+    back to the wrong language - raises ValueError so the parent can retry.
+    """
+    code = (lang_code or "en").lower()
+    cfg = SUPPORTED_LANGUAGES.get(code)
+    if not cfg or not (text or "").strip():
+        return text, False
+    if _script_ratio(text, cfg["script"]) >= 0.6:
+        return text, False
+
+    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    prompt = f"""Translate the following children's bedtime story text into {lang_label}.
+Rules:
+- Keep the meaning, characters and the warm, gentle, sleepy tone.
+- Use simple, natural {lang_label} that young children understand, written in the normal {lang_label} script (not transliteration).
+- Keep the same paragraph breaks.
+- Output ONLY the translated text. No notes, no quotes, no explanations.
+
+TEXT:
+{text}
+"""
+    last_err = None
+    for _ in range(2):
+        try:
+            response = call_gemini_with_fallback(
+                client=client,
+                prompt=prompt,
+                config=types.GenerateContentConfig(temperature=0.3),
+            )
+            out = sanitize_text((response.text or "").strip())
+            if out and _script_ratio(out, cfg["script"]) >= 0.5:
+                return out, True
+            last_err = "translation came back in the wrong script"
+        except Exception as exc:
+            last_err = str(exc)
+    raise ValueError(
+        f"We couldn't translate the story into {lang_label} right now ({last_err}). Please try again in a moment."
+    )
+
+
+def resolve_language(supabase, language_id: int = 1, language_code: Optional[str] = None) -> tuple[int, str, str]:
+    """
+    Returns (language_id, label, code). When the app sends a language_code
+    (en/hi/bn/or/kn) it is looked up in the `languages` table (and added if
+    missing); otherwise falls back to the numeric language_id as before.
+    """
+    code = (language_code or "").strip().lower()
+    if code and code in SUPPORTED_LANGUAGES:
+        label = SUPPORTED_LANGUAGES[code]["label"]
+        res = supabase.table("languages").select("id, label, code").eq("code", code).limit(1).execute()
+        if res.data:
+            return res.data[0]["id"], res.data[0].get("label") or label, code
+        try:
+            # The languages.id column has no auto-number, so pick the next free id.
+            mx = supabase.table("languages").select("id").order("id", desc=True).limit(1).execute()
+            next_id = ((mx.data[0]["id"] if mx.data else 0) or 0) + 1
+            ins = supabase.table("languages").insert(
+                {"id": next_id, "code": code, "label": label, "is_active": True}
+            ).execute()
+            if ins.data:
+                return ins.data[0]["id"], label, code
+        except Exception as exc:
+            raise ValueError(
+                f"{label} isn't set up in the database yet. Please run add_languages.sql in Supabase. ({exc})"
+            )
+    res = supabase.table("languages").select("id, label, code").eq("id", language_id).limit(1).execute()
+    if res.data:
+        return res.data[0]["id"], res.data[0].get("label") or "English", res.data[0].get("code") or "en"
+    return language_id, "English", "en"
 
 
 def derive_title_from_text(text: str, max_words: int = 8) -> str:
@@ -397,8 +501,7 @@ def rate_story(
     except Exception as e:
         print(f"[Rate Story Aggregation Update Note] {e}")
 
-    # 4. Invalidate memory cache so all clients immediately get fresh rating stats
-    invalidate_story_library_cache()
+    # (No in-memory story cache anymore - nothing to invalidate.)
 
     return {
         "story_text_id": story_text_id,
@@ -460,6 +563,21 @@ def get_ambient_track_for_story(title: str, teaser: str, category_name: str = ""
 
 
 
+_LANG_CODE_CACHE: Dict[Any, str] = {}
+
+
+def _language_code_map(supabase) -> Dict[Any, str]:
+    """languages.id -> code. Rarely changes, so it is loaded once and kept."""
+    global _LANG_CODE_CACHE
+    if not _LANG_CODE_CACHE:
+        try:
+            rows = supabase.table("languages").select("id, code").execute().data or []
+            _LANG_CODE_CACHE = {r["id"]: r.get("code") for r in rows if r.get("code")}
+        except Exception as e:
+            print(f"[language map] {e}")
+    return _LANG_CODE_CACHE
+
+
 def enrich_audio_story_items(supabase, stories: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Ultra-fast audio-only enrichment: 1 DB query, zero image storage calls."""
     if not stories:
@@ -470,24 +588,58 @@ def enrich_audio_story_items(supabase, stories: List[Dict[str, Any]]) -> List[Di
     # Fetch cached audio records in 1 fast query
     audio_res = (
         supabase.table("story_audio")
-        .select("story_text_id, audio_url, duration_seconds")
+        .select("story_text_id, voice_tier, audio_url, duration_seconds")
         .in_("story_text_id", story_ids)
         .execute()
     )
-    audio_map = {r["story_text_id"]: r for r in (audio_res.data or [])}
+    audio_map = {}
+    for r in (audio_res.data or []):
+        # Language-version audio (tier ends in _hi/_bn/_or/_kn) must never be
+        # used as the story's default audio.
+        if (r.get("voice_tier") or "").rsplit("_", 1)[-1] in TRANSLATION_SUFFIXES:
+            continue
+        audio_map[r["story_text_id"]] = r
+
+    # Which languages each story is available in (original + admin-added versions)
+    translations_by_story = {}
+    lang_code_by_id = _language_code_map(supabase)
+    for attempt in range(3):
+        try:
+            tr_rows = (
+                supabase.table("story_translations")
+                .select("story_text_id, language_id")
+                .in_("story_text_id", story_ids)
+                .execute()
+                .data or []
+            )
+            if any(t["language_id"] not in lang_code_by_id for t in tr_rows):
+                _LANG_CODE_CACHE.clear()  # a language was added since the map was loaded
+                lang_code_by_id = _language_code_map(supabase)
+            for t in tr_rows:
+                code = lang_code_by_id.get(t["language_id"])
+                if code:
+                    translations_by_story.setdefault(t["story_text_id"], []).append(code)
+            break
+        except Exception as e:
+            if attempt == 2:
+                print(f"[language_codes] lookup skipped: {e}")
+            else:
+                time.sleep(0.2 * (attempt + 1))
 
     enriched = []
     for s in stories:
         sid = s["id"]
         aud = audio_map.get(sid)
         has_audio = aud is not None
+        orig_code = lang_code_by_id.get(s.get("language_id")) or "en"
         enriched.append({
             **s,
             "has_audio": has_audio,
             "has_images": False,
             "audio_url": aud["audio_url"] if aud else None,
             "duration_seconds": aud["duration_seconds"] if aud else None,
-            "scenes_count": 0
+            "scenes_count": 0,
+            "language_codes": [orig_code] + [c for c in translations_by_story.get(sid, []) if c != orig_code],
         })
 
     def sort_priority(item):
@@ -502,7 +654,7 @@ def enrich_audio_story_items(supabase, stories: List[Dict[str, Any]]) -> List[Di
 
 
 
-def get_precreated_stories(
+def _precreated_core(
     category_id: Optional[str] = None,
     age_group_id: int = 1,
     language_id: int = 1,
@@ -532,7 +684,6 @@ def get_precreated_stories(
             supabase.table("story_texts")
             .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at")
             .eq("age_group_id", age_group_id)
-            .eq("language_id", language_id)
             .is_("owner_user_id", "null")
         )
         if sort_by == "newest":
@@ -547,7 +698,6 @@ def get_precreated_stories(
         supabase.table("story_texts")
         .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at")
         .eq("age_group_id", age_group_id)
-        .eq("language_id", language_id)
         .is_("owner_user_id", "null")
     )
 
@@ -591,6 +741,76 @@ def get_precreated_stories(
                 stories.extend(insert_res.data)
 
     return enrich_audio_story_items(supabase, stories)
+
+
+def apply_language_view(supabase, stories: List[Dict[str, Any]], language_code: Optional[str]) -> List[Dict[str, Any]]:
+    """
+    Keeps only the stories that have a version in `language_code` (original or
+    an admin-added translation) and shows each one with that version's title
+    and teaser. No language given -> list unchanged.
+    """
+    code = (language_code or "").strip().lower()
+    if not code:
+        return stories
+    kept = [s for s in stories if code in (s.get("language_codes") or [])]
+    if not kept:
+        return []
+    # Titles only need fetching for stories whose original language differs
+    # from the chosen one (the common English-only case needs no extra query).
+    if all(((s.get("language_codes") or [None])[0] == code) for s in kept):
+        return [{**s, "language_code": code} for s in kept]
+    lang_id = None
+    for lid, c in _language_code_map(supabase).items():
+        if c == code:
+            lang_id = lid
+            break
+    translated = {}
+    if lang_id is not None:
+        try:
+            rows = (
+                supabase.table("story_translations")
+                .select("story_text_id, title, teaser")
+                .eq("language_id", lang_id)
+                .in_("story_text_id", [s["id"] for s in kept])
+                .execute().data or []
+            )
+            translated = {r["story_text_id"]: r for r in rows}
+        except Exception as e:
+            print(f"[language view] {e}")
+    out = []
+    for s in kept:
+        tr = translated.get(s["id"])
+        item = {**s, "language_code": code}
+        if tr:
+            item["title"] = tr.get("title") or s.get("title")
+            item["teaser"] = tr.get("teaser") or s.get("teaser")
+        out.append(item)
+    return out
+
+
+def get_precreated_stories(
+    category_id: Optional[str] = None,
+    age_group_id: int = 1,
+    language_id: int = 1,
+    sort_by: str = "popular",
+    is_admin: bool = False,
+    language_code: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    stories = _precreated_core(category_id, age_group_id, language_id, sort_by, is_admin)
+    return apply_language_view(get_supabase(), stories, language_code)
+
+
+def search_stories(
+    query: str,
+    age_group_id: int,
+    language_id: int = 1,
+    allow_ai_generate: bool = True,
+    is_admin: bool = False,
+    category_id: Optional[str] = None,
+    language_code: Optional[str] = None,
+) -> list:
+    results = _search_core(query, age_group_id, language_id, allow_ai_generate, is_admin, category_id)
+    return apply_language_view(get_supabase(), results, language_code)
 
 
 def browse_story_options(
@@ -645,7 +865,7 @@ Respond strictly with a JSON object:
 
 
 
-def search_stories(
+def _search_core(
     query: str,
     age_group_id: int,
     language_id: int = 1,
@@ -676,7 +896,6 @@ def search_stories(
         supabase.table("story_texts")
         .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at")
         .eq("age_group_id", age_group_id)
-        .eq("language_id", language_id)
         .is_("owner_user_id", "null")
     )
     if category_id:
@@ -688,7 +907,6 @@ def search_stories(
         supabase.table("story_texts")
         .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at")
         .eq("age_group_id", age_group_id)
-        .eq("language_id", language_id)
         .is_("owner_user_id", "null")
     )
     if category_id:
@@ -790,6 +1008,8 @@ def publish_manual_story(
     accent_id: str = "us",
     cover_image_bytes: bytes = None,
     cover_image_mime: str = None,
+    language_code: str = None,
+    extra_language_codes: list = None,
 ) -> dict:
     """
     Admin manual publish: the admin types or pastes the story text directly
@@ -815,6 +1035,17 @@ def publish_manual_story(
         raise ValueError("Please enter a title.")
     if not full_text or word_count(full_text) < 20:
         raise ValueError("Please enter the full story text (at least a few sentences).")
+
+    language_id, lang_label, lang_code = resolve_language(supabase, language_id, language_code)
+    # If the admin picked a language different from the text they typed,
+    # translate the story (and its title/teaser) into the chosen language.
+    full_text, was_translated = ensure_text_in_language(full_text, lang_code, lang_label)
+    if was_translated:
+        title, _ = ensure_text_in_language(title, lang_code, lang_label)
+        teaser = None
+        title = sanitize_text(title)
+    elif teaser:
+        teaser, _ = ensure_text_in_language(teaser, lang_code, lang_label)
 
     teaser = sanitize_text((teaser or "").strip()) or derive_teaser_from_text(full_text)
 
@@ -873,8 +1104,19 @@ def publish_manual_story(
     except Exception as e:
         print(f"Immediate narration failed for manually published story {new_story['id']}, will narrate on first play instead: {e}")
 
+    language_errors = []
+    if extra_language_codes:
+        try:
+            done = add_story_languages(new_story["id"], extra_language_codes, voice_id=voice_id, accent_id=accent_id)
+            language_errors = done.get("errors", [])
+        except Exception as e:
+            language_errors = [str(e)]
+
     enriched = enrich_audio_story_items(supabase, [new_story])
-    return enriched[0] if enriched else new_story
+    out = enriched[0] if enriched else new_story
+    if language_errors:
+        out["language_errors"] = language_errors
+    return out
 
 
 def _voice_and_accent_for_story(supabase, story_text_id: str) -> tuple:
@@ -995,6 +1237,7 @@ def update_manual_story(
             cover_image_upload_failed = True
 
     if text_changed:
+        # Other-language versions are kept as they are (edit them separately).
         voice_id, accent_id = _voice_and_accent_for_story(supabase, story_text_id)
         try:
             commit_and_narrate_story(
@@ -1234,6 +1477,7 @@ def generate_multimodal_story(
     pdf_page_from: int = None,
     pdf_page_to: int = None,
     accent_id: str = "us",
+    language_code: str = None,
 ) -> dict:
     from app.services.usage_service import check_and_increment_usage
     from app.services.tts_service import synthesize_story_audio
@@ -1267,9 +1511,7 @@ def generate_multimodal_story(
             category_id = cat_res.data[0]["id"]
             cat_name = cat_res.data[0]["name"]
 
-    lang_res = supabase.table("languages").select("label, code").eq("id", language_id).limit(1).execute()
-    lang_label = lang_res.data[0]["label"] if lang_res.data else "English"
-    lang_code = lang_res.data[0].get("code", "en") if lang_res.data else "en"
+    language_id, lang_label, lang_code = resolve_language(supabase, language_id, language_code)
 
     truncated = False
     notice = None
@@ -1315,7 +1557,7 @@ Return ONLY valid JSON: {"extracted_text": "..."}
                 "well-lit picture of the page, with the text filling the frame."
             )
 
-        full_text, truncated = enforce_story_length(extracted_text, target_words=target_words_for_tier(subscription_tier))
+        full_text, truncated = enforce_story_length(extracted_text, target_words=target_words_for_language(subscription_tier, lang_code))
         title = derive_title_from_text(extracted_text)
         teaser = derive_teaser_from_text(full_text)
         if truncated:
@@ -1415,7 +1657,7 @@ Return ONLY valid JSON: {"extracted_text": "..."}
 
         # Narrate the file's own text exactly as extracted - no Gemini call,
         # no AI rewriting, at any length.
-        full_text, truncated = enforce_story_length(extracted_text, target_words=target_words_for_tier(subscription_tier))
+        full_text, truncated = enforce_story_length(extracted_text, target_words=target_words_for_language(subscription_tier, lang_code))
         title = derive_title_from_text(extracted_text)
         teaser = derive_teaser_from_text(full_text)
         if truncated:
@@ -1425,11 +1667,19 @@ Return ONLY valid JSON: {"extracted_text": "..."}
         prompt = (text_prompt or "A calm night").strip()
 
         # Narrate exactly what was typed - no Gemini call, no AI rewriting.
-        full_text, truncated = enforce_story_length(prompt, target_words=target_words_for_tier(subscription_tier))
+        full_text, truncated = enforce_story_length(prompt, target_words=target_words_for_language(subscription_tier, lang_code))
         title = derive_title_from_text(prompt)
         teaser = derive_teaser_from_text(full_text)
         if truncated:
             notice = TRUNCATION_NOTICE
+
+    # Convert to the language the parent picked (skipped when the text is
+    # already in that language). Length was already capped above in the
+    # source text, scaled for the chosen language.
+    full_text, was_translated = ensure_text_in_language(full_text, lang_code, lang_label)
+    if was_translated:
+        title, _ = ensure_text_in_language(title, lang_code, lang_label)
+        teaser = derive_teaser_from_text(full_text)
 
     # Final safety net: guarantee nothing NUL-containing ever reaches Postgres,
     # regardless of which branch above produced title/teaser/full_text.
@@ -1704,4 +1954,245 @@ def commit_and_narrate_story(
         "provider": "google_tts",
         "ambient_sound": ambient_sound,
         "cached": False
+    }
+
+
+# ---------------------------------------------------------------------------
+# Language versions of a story (admin adds, listeners pick inside the player)
+# ---------------------------------------------------------------------------
+def _translation_tier(voice_id: str, accent_id: str, lang_code: str) -> str:
+    return f"standard_{voice_id}_{accent_id}_{lang_code}"
+
+
+def _language_code_for_id(supabase, language_id) -> str:
+    res = supabase.table("languages").select("code").eq("id", language_id).limit(1).execute()
+    return (res.data[0].get("code") if res.data else None) or "en"
+
+
+def _clear_translations(supabase, story_text_id: str) -> bool:
+    """Deletes every language version (text + audio rows) of a story."""
+    removed = False
+    try:
+        res = supabase.table("story_translations").delete().eq("story_text_id", story_text_id).execute()
+        removed = bool(res.data)
+        audio_rows = supabase.table("story_audio").select("voice_tier").eq("story_text_id", story_text_id).execute().data or []
+        for r in audio_rows:
+            tier = r.get("voice_tier") or ""
+            if tier.rsplit("_", 1)[-1] in TRANSLATION_SUFFIXES:
+                supabase.table("story_audio").delete().eq("story_text_id", story_text_id).eq("voice_tier", tier).execute()
+    except Exception as e:
+        print(f"[clear translations] {story_text_id}: {e}")
+    return removed
+
+
+def _narrate_translation(supabase, story_text_id: str, lang_code: str, text: str, voice_id: str, accent_id: str) -> dict:
+    from app.services.tts_service import synthesize_story_audio
+    from app.services.tts_usage_service import record_tts_characters
+
+    audio_bytes, duration_seconds = synthesize_story_audio(
+        full_text=text, language_code=lang_code, voice_id=voice_id, accent_id=accent_id
+    )
+    record_tts_characters(len(text))
+    storage_path = f"standard/{story_text_id}_{lang_code}_{voice_id}_{accent_id}.mp3"
+    supabase.storage.from_("story-audio").upload(
+        path=storage_path,
+        file=audio_bytes,
+        file_options={"content-type": "audio/mpeg", "upsert": "true"},
+    )
+    url = supabase.storage.from_("story-audio").get_public_url(storage_path)
+    supabase.table("story_audio").upsert(
+        {
+            "story_text_id": story_text_id,
+            "voice_tier": _translation_tier(voice_id, accent_id, lang_code),
+            "provider": f"google_tts:{voice_id}:{accent_id}",
+            "audio_url": url,
+            "duration_seconds": duration_seconds,
+        },
+        on_conflict="story_text_id,voice_tier",
+    ).execute()
+    return {"audio_url": url, "duration_seconds": duration_seconds}
+
+
+def add_story_languages(story_text_id: str, language_codes: list, voice_id: str = None, accent_id: str = None, force: bool = False) -> dict:
+    """
+    Admin: adds language versions to an existing story. For each language the
+    story text + title are translated by Gemini (skipped if already in that
+    language), saved in story_translations, and narrated with the story's
+    voice. Already-existing versions are reused (never paid for twice).
+    """
+    supabase = get_supabase()
+    story_res = supabase.table("story_texts").select("*").eq("id", story_text_id).single().execute()
+    if not story_res.data:
+        raise ValueError("Story not found.")
+    story = story_res.data
+    if not (story.get("full_text") or "").strip():
+        raise ValueError("This story has no text yet.")
+
+    cur_voice, cur_accent = _voice_and_accent_for_story(supabase, story_text_id)
+    voice_id = voice_id or cur_voice
+    accent_id = accent_id or cur_accent
+    orig_code = _language_code_for_id(supabase, story.get("language_id"))
+
+    added, errors = [], []
+    for code in dict.fromkeys([(c or "").strip().lower() for c in (language_codes or [])]):
+        if not code or code == orig_code or code not in SUPPORTED_LANGUAGES:
+            continue
+        try:
+            lang_id, label, code = resolve_language(supabase, 1, code)
+            if force:
+                supabase.table("story_translations").delete().eq("story_text_id", story_text_id).eq("language_id", lang_id).execute()
+                supabase.table("story_audio").delete().eq("story_text_id", story_text_id).eq("voice_tier", _translation_tier(voice_id, accent_id, code)).execute()
+            existing = (
+                supabase.table("story_translations").select("*")
+                .eq("story_text_id", story_text_id).eq("language_id", lang_id).limit(1).execute()
+            )
+            if existing.data:
+                row = existing.data[0]
+            else:
+                text, _ = ensure_text_in_language(story["full_text"], code, label)
+                title, _ = ensure_text_in_language(story.get("title") or "", code, label)
+                teaser = derive_teaser_from_text(text)
+                ins = supabase.table("story_translations").insert({
+                    "story_text_id": story_text_id,
+                    "language_id": lang_id,
+                    "title": sanitize_text(title) or sanitize_text(story.get("title") or "Story"),
+                    "teaser": sanitize_text(teaser),
+                    "full_text": sanitize_text(text),
+                }).execute()
+                row = ins.data[0]
+            tier = _translation_tier(voice_id, accent_id, code)
+            have_audio = supabase.table("story_audio").select("voice_tier").eq("story_text_id", story_text_id).eq("voice_tier", tier).limit(1).execute()
+            if not have_audio.data:
+                _narrate_translation(supabase, story_text_id, code, row["full_text"], voice_id, accent_id)
+            added.append(code)
+        except Exception as e:
+            print(f"[add language {code}] {story_text_id}: {e}")
+            errors.append(f"{SUPPORTED_LANGUAGES.get(code, {}).get('label', code)}: {e}")
+    return {"added": added, "errors": errors}
+
+
+def get_story_translation_detail(story_text_id: str, language_code: str) -> dict:
+    supabase = get_supabase()
+    lang_id, label, code = resolve_language(supabase, 1, language_code)
+    tr = (
+        supabase.table("story_translations").select("*")
+        .eq("story_text_id", story_text_id).eq("language_id", lang_id).limit(1).execute()
+    )
+    if not tr.data:
+        raise ValueError(f"No {label} version yet.")
+    row = tr.data[0]
+    return {"language_code": code, "title": row.get("title"), "teaser": row.get("teaser"), "full_text": row.get("full_text")}
+
+
+def update_story_translation(story_text_id: str, language_code: str, title: str = None, full_text: str = None) -> dict:
+    """
+    Admin edit of ONE language version. Only that language is changed; if its
+    text changed, only that language is re-narrated (same voice as the story).
+    """
+    supabase = get_supabase()
+    lang_id, label, code = resolve_language(supabase, 1, language_code)
+    tr = (
+        supabase.table("story_translations").select("*")
+        .eq("story_text_id", story_text_id).eq("language_id", lang_id).limit(1).execute()
+    )
+    if not tr.data:
+        raise ValueError(f"No {label} version to edit yet.")
+    row = tr.data[0]
+    payload = {}
+    text_changed = False
+    if title is not None and title.strip():
+        payload["title"] = sanitize_text(title.strip())
+    if full_text is not None and full_text.strip():
+        clean = sanitize_text(full_text.strip())
+        if word_count(clean) < 20:
+            raise ValueError("Please enter the full story text (at least a few sentences).")
+        if clean != (row.get("full_text") or ""):
+            text_changed = True
+        payload["full_text"] = clean
+        payload["teaser"] = sanitize_text(derive_teaser_from_text(clean))
+    if payload:
+        supabase.table("story_translations").update(payload).eq("id", row["id"]).execute()
+    if text_changed:
+        voice_id, accent_id = _voice_and_accent_for_story(supabase, story_text_id)
+        _narrate_translation(supabase, story_text_id, code, payload["full_text"], voice_id, accent_id)
+    fresh = supabase.table("story_texts").select("*").eq("id", story_text_id).single().execute().data
+    enriched = enrich_audio_story_items(supabase, [fresh])
+    return enriched[0] if enriched else fresh
+
+
+def list_story_languages(story_text_id: str) -> list:
+    supabase = get_supabase()
+    story_res = supabase.table("story_texts").select("language_id").eq("id", story_text_id).single().execute()
+    if not story_res.data:
+        raise ValueError("Story not found.")
+    orig = _language_code_for_id(supabase, story_res.data.get("language_id"))
+    codes = [orig]
+    rows = supabase.table("story_translations").select("language_id").eq("story_text_id", story_text_id).execute().data or []
+    for r in rows:
+        c = _language_code_for_id(supabase, r["language_id"])
+        if c not in codes:
+            codes.append(c)
+    return [{"code": c, "label": SUPPORTED_LANGUAGES.get(c, {}).get("label", c)} for c in codes]
+
+
+def get_story_in_language(
+    story_text_id: str,
+    language_code: str,
+    voice_id: str = "luna",
+    accent_id: str = "us",
+    user_id: Optional[str] = None,
+    is_admin: bool = False,
+) -> dict:
+    """Plays a story in one of its available languages (original or a saved version)."""
+    from app.services.history_service import record_story_event
+
+    supabase = get_supabase()
+    story_res = supabase.table("story_texts").select("*").eq("id", story_text_id).single().execute()
+    if not story_res.data:
+        raise ValueError("Story not found.")
+    story = story_res.data
+    code = (language_code or "").strip().lower()
+    orig = _language_code_for_id(supabase, story.get("language_id"))
+    if not code or code == orig:
+        return commit_and_narrate_story(
+            story_text_id=story_text_id, voice_id=voice_id, voice_tier="standard",
+            user_id=user_id, is_admin=is_admin, accent_id=accent_id,
+        )
+
+    lang_id, label, code = resolve_language(supabase, 1, code)
+    tr = (
+        supabase.table("story_translations").select("*")
+        .eq("story_text_id", story_text_id).eq("language_id", lang_id).limit(1).execute()
+    )
+    if not tr.data:
+        raise ValueError(f"This story isn't available in {label} yet.")
+    # Language versions are saved in the voice the admin published with, so
+    # a listener never triggers a new (paid) narration just by switching.
+    voice_id, accent_id = _voice_and_accent_for_story(supabase, story_text_id)
+    row = tr.data[0]
+
+    tier = _translation_tier(voice_id, accent_id, code)
+    aud = supabase.table("story_audio").select("*").eq("story_text_id", story_text_id).eq("voice_tier", tier).limit(1).execute()
+    cached = bool(aud.data)
+    if cached:
+        audio_url, duration = aud.data[0]["audio_url"], aud.data[0]["duration_seconds"]
+    else:
+        made = _narrate_translation(supabase, story_text_id, code, row["full_text"], voice_id, accent_id)
+        audio_url, duration = made["audio_url"], made["duration_seconds"]
+
+    record_story_event(
+        user_id=user_id, origin="library", story_text_id=story_text_id,
+        title=row.get("title"), voice_id=voice_id, audio_url=audio_url, duration_seconds=duration,
+    )
+    return {
+        "story_text_id": story_text_id,
+        "title": row["title"],
+        "teaser": row.get("teaser") or "",
+        "full_text": row["full_text"],
+        "audio_url": audio_url,
+        "duration_seconds": duration,
+        "voice_tier": "standard",
+        "provider": f"google_tts:{voice_id}:{accent_id}",
+        "ambient_sound": get_ambient_track_for_story(row.get("title", ""), row.get("teaser", "")),
+        "cached": cached,
     }

@@ -99,11 +99,11 @@ export const api = {
   getAccents: () => request("/api/lookups/accents"),
 
   // Tab 1: Listen to Story (Pre-created from DB)
-  getPrecreatedStories: (categoryId, ageGroupId, languageId = 1, sortBy = "popular") =>
+  getPrecreatedStories: (categoryId, ageGroupId, languageId = 1, sortBy = "popular", languageCode = null) =>
     request(
       `/api/stories/precreated?age_group_id=${ageGroupId}&language_id=${languageId}${
         categoryId ? `&category_id=${categoryId}` : ""
-      }&sort_by=${sortBy}`
+      }&sort_by=${sortBy}${languageCode ? `&language_code=${languageCode}` : ""}`
     ),
 
   // Rate a story (1-5 stars)
@@ -170,19 +170,36 @@ export const api = {
 
   // Commit / Play Precreated Story (renders narration on a cache miss - can
   // take a while, so it gets the longer AI timeout budget too)
-  commitStory: (storyTextId, voiceTier = "standard", voiceId = "luna", accentId = "us") =>
+  commitStory: (storyTextId, voiceTier = "standard", voiceId = "luna", accentId = "us", languageCode = null) =>
     request(
       `/api/stories/${storyTextId}/commit`,
       {
         method: "POST",
-        body: JSON.stringify({ voice_tier: voiceTier, voice_id: voiceId, accent_id: accentId }),
+        body: JSON.stringify({
+          voice_tier: voiceTier,
+          voice_id: voiceId,
+          accent_id: accentId,
+          ...(languageCode ? { language_code: languageCode } : {}),
+        }),
       },
       AI_REQUEST_TIMEOUT_MS
     ),
 
+  // Languages a story can be played in (original + admin-added versions)
+  getStoryLanguages: (storyTextId) => request(`/api/stories/${storyTextId}/languages`),
+
+  // Admin: translate + narrate extra language versions of a published story.
+  // Called one language at a time so each request stays short.
+  addStoryLanguages: (storyTextId, languageCodes, force = false) =>
+    request(
+      `/api/stories/${storyTextId}/add-languages`,
+      { method: "POST", body: JSON.stringify({ language_codes: languageCodes, force }) },
+      240000
+    ),
+
   // Open & DB Search (categoryId is admin-only: which category to publish a
   // newly AI-generated story into when nothing matches in the DB)
-  searchStories: (query, ageGroupId, languageId = 1, allowAiGenerate = false, categoryId = null) =>
+  searchStories: (query, ageGroupId, languageId = 1, allowAiGenerate = false, categoryId = null, languageCode = null) =>
     request(
       "/api/stories/search",
       {
@@ -193,6 +210,7 @@ export const api = {
           language_id: languageId,
           allow_ai_generate: allowAiGenerate,
           category_id: categoryId,
+          language_code: languageCode,
         }),
       },
       allowAiGenerate ? AI_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS
@@ -233,6 +251,8 @@ export const api = {
   // Admin "Edit Story": full editable detail for an already-published
   // story (title, text, cover image, and its current narrator voice +
   // accent), used to pre-fill the edit screen.
+  getStoryLanguageText: (storyTextId, code) => request(`/api/stories/${storyTextId}/language-text/${code}`),
+
   getStoryAdminDetail: (storyTextId) => request(`/api/stories/${storyTextId}/admin-detail`),
 
   // Admin "Edit Story": save changes to title/text/cover image. Category

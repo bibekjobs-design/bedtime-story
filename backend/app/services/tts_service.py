@@ -36,7 +36,7 @@ def chunk_text(text: str, max_chars: int = 4000) -> list[str]:
                 chunks.append(current_chunk)
             # If a single paragraph is longer than max_chars, split by sentences
             if len(para) > max_chars:
-                sentences = re.split(r"(?<=[.!?])\s+", para)
+                sentences = re.split(r"(?<=[.!?।॥])\s+", para)
                 sub_chunk = ""
                 for sent in sentences:
                     if len(sub_chunk) + len(sent) + 1 <= max_chars:
@@ -136,6 +136,26 @@ def _voice_name_for_locale(base_voice_name: str, locale: str) -> str:
     return f"{locale}-{suffix}"
 
 
+# Indian-language narration. Hindi / Bengali / Kannada use Google's Chirp3-HD
+# voices (same persona names as English: Aoede=Luna, Charon=Oliver, Kore=Willow,
+# Puck=Jasper) with a Wavenet/Neural2 fallback. Odia is NOT in Chirp3-HD, so it
+# is not offered.
+INDIAN_LANGS = {
+    "hi": {"locale": "hi-IN", "fallback_f": "hi-IN-Neural2-A", "fallback_m": "hi-IN-Neural2-B"},
+    "bn": {"locale": "bn-IN", "fallback_f": "bn-IN-Wavenet-A", "fallback_m": "bn-IN-Wavenet-B"},
+    "kn": {"locale": "kn-IN", "fallback_f": "kn-IN-Wavenet-A", "fallback_m": "kn-IN-Wavenet-B"},
+    "te": {"locale": "te-IN", "fallback_f": "te-IN-Standard-A", "fallback_m": "te-IN-Standard-B"},
+}
+GEMINI_TTS_MODEL = "gemini-2.5-flash-tts"
+GEMINI_VOICE_FOR_PERSONA = {"luna": "Aoede", "oliver": "Charon", "willow": "Kore", "jasper": "Puck"}
+GEMINI_STYLE_PROMPT = "Read this aloud as a warm, gentle, soothing bedtime story for a young child, slowly and calmly."
+
+
+def _lang_key(language_code: str) -> str:
+    code = (language_code or "en").lower().split("-")[0]
+    return code if code in INDIAN_LANGS else "en"
+
+
 def synthesize_story_audio(
     full_text: str,
     language_code: str = "en",
@@ -143,9 +163,11 @@ def synthesize_story_audio(
     accent_id: str = "us"
 ) -> Tuple[bytes, int]:
     """
-    Synthesizes bedtime narration audio using Google Cloud Text-to-Speech voices with parallel chunk processing and automatic fallback.
-    `accent_id` picks the English locale (US/UK/India/Australia) for the
-    chosen narrator persona - ignored for non-English (e.g. Hindi) narration.
+    Synthesizes bedtime narration audio using Google Cloud Text-to-Speech with
+    parallel chunk processing and automatic fallback voices.
+    English: `accent_id` picks the locale (US/UK/India/Australia).
+    Hindi/Bengali/Kannada: Chirp3-HD voice of the chosen persona (accent ignored).
+    Odia: Gemini-TTS voice of the chosen persona (accent ignored).
     """
     import time
     from concurrent.futures import ThreadPoolExecutor
@@ -153,65 +175,84 @@ def synthesize_story_audio(
     client = _get_tts_client()
 
     voice_meta = NARRATOR_VOICES.get(voice_id, NARRATOR_VOICES["luna"])
-    locale = _locale_for_accent(accent_id)
-    gender_letter = "D" if voice_meta["gender"] == "male" else "F"
-    candidate_voices = [
-        _voice_name_for_locale(voice_meta.get("voice_name"), locale),
-        f"{locale}-Neural2-{gender_letter}",
-        "en-US-Neural2-D" if voice_meta["gender"] == "male" else "en-US-Neural2-F"
-    ]
+    lang = _lang_key(language_code)
+    is_male = voice_meta["gender"] == "male"
 
-    chunks = chunk_text(full_text, max_chars=900)
+    # Each candidate = (language_tag, voice_name, model_name_or_None, use_style_prompt)
+    candidates = []
+    if lang == "en":
+        locale = _locale_for_accent(accent_id)
+        gender_letter = "D" if is_male else "F"
+        candidates.append((locale, _voice_name_for_locale(voice_meta.get("voice_name"), locale), None, False))
+        candidates.append((locale, f"{locale}-Neural2-{gender_letter}", None, False))
+        candidates.append(("en-US", "en-US-Neural2-D" if is_male else "en-US-Neural2-F", None, False))
+        max_chars = 900
+        speaking_rate = 0.85
+    else:
+        cfg = INDIAN_LANGS[lang]
+        locale = cfg["locale"]
+        if cfg.get("gemini"):
+            candidates.append((locale, GEMINI_VOICE_FOR_PERSONA.get(voice_id, "Aoede"), GEMINI_TTS_MODEL, True))
+            max_chars = 700  # Odia is 3 bytes/char in UTF-8; Gemini-TTS limit is 4000 bytes
+        else:
+            persona = (voice_meta.get("voice_name") or "en-US-Chirp3-HD-Aoede").split("-", 2)[-1]
+            candidates.append((locale, f"{locale}-{persona}", None, False))
+            candidates.append((locale, cfg["fallback_m"] if is_male else cfg["fallback_f"], None, False))
+            max_chars = 700
+        speaking_rate = 0.88
+
+    chunks = chunk_text(full_text, max_chars=max_chars)
     audio_segments = []
+    last_error = None
 
-    for v_name in candidate_voices:
-        if not v_name:
-            continue
+    for lang_tag, v_name, model_name, use_prompt in candidates:
         try:
-            if language_code.startswith("hi"):
-                lang_tag = "hi-IN"
-                actual_v_name = "hi-IN-Neural2-A" if voice_meta["gender"] == "female" else "hi-IN-Neural2-B"
-                audio_config = texttospeech.AudioConfig(
-                    audio_encoding=texttospeech.AudioEncoding.MP3,
-                    speaking_rate=0.82,
-                    pitch=-1.0
+            if model_name:
+                voice = texttospeech.VoiceSelectionParams(
+                    language_code=lang_tag, name=v_name, model_name=model_name
                 )
+                # Gemini-TTS does not use speaking_rate; style comes from the prompt.
+                audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
             else:
-                lang_tag = locale
-                actual_v_name = v_name
+                voice = texttospeech.VoiceSelectionParams(language_code=lang_tag, name=v_name)
                 audio_config = texttospeech.AudioConfig(
                     audio_encoding=texttospeech.AudioEncoding.MP3,
-                    speaking_rate=0.85,
+                    speaking_rate=speaking_rate,
                 )
 
-            voice = texttospeech.VoiceSelectionParams(
-                language_code=lang_tag,
-                name=actual_v_name
-            )
+            def _synthesize_chunk(chunk_str: str, _voice=voice, _cfg=audio_config, _prompt=use_prompt) -> bytes:
+                if _prompt:
+                    s_input = texttospeech.SynthesisInput(text=chunk_str, prompt=GEMINI_STYLE_PROMPT)
+                else:
+                    s_input = texttospeech.SynthesisInput(text=chunk_str)
+                for attempt in range(3):
+                    try:
+                        resp = client.synthesize_speech(input=s_input, voice=_voice, audio_config=_cfg)
+                        return resp.audio_content
+                    except Exception:
+                        if attempt == 2:
+                            raise
+                        time.sleep(1.5 * (attempt + 1))
 
-            def _synthesize_chunk(chunk_str: str) -> bytes:
-                s_input = texttospeech.SynthesisInput(text=chunk_str)
-                resp = client.synthesize_speech(
-                    input=s_input,
-                    voice=voice,
-                    audio_config=audio_config
-                )
-                return resp.audio_content
-
+            workers = 2 if model_name else 4
             if len(chunks) == 1:
                 audio_segments = [_synthesize_chunk(chunks[0])]
             else:
-                with ThreadPoolExecutor(max_workers=min(4, len(chunks))) as executor:
+                with ThreadPoolExecutor(max_workers=min(workers, len(chunks))) as executor:
                     audio_segments = list(executor.map(_synthesize_chunk, chunks))
 
             if audio_segments:
                 break
         except Exception as e:
-            print(f"[TTS parallel synthesis notice with {v_name}] {e}. Trying fallback voice...")
+            last_error = e
+            print(f"[TTS synthesis notice with {v_name}] {e}. Trying fallback voice...")
+            audio_segments = []
             time.sleep(0.5)
 
     if not audio_segments:
-        raise RuntimeError(f"TTS synthesis failed for voice '{voice_id}' across all candidate voices.")
+        raise RuntimeError(
+            f"TTS synthesis failed for voice '{voice_id}' in language '{lang}' across all candidate voices. {last_error or ''}"
+        )
 
     full_audio_bytes = b"".join(audio_segments)
     word_count = len(full_text.split())

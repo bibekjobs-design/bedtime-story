@@ -81,6 +81,11 @@ class StoryTeaserResponse(BaseModel):
     total_ratings: Optional[int] = 1
     cover_image_url: Optional[str] = None
     cover_image_upload_failed: Optional[bool] = None
+    created_at: Optional[str] = None
+    language_codes: Optional[List[str]] = None
+    language_errors: Optional[List[str]] = None
+    translations_cleared: Optional[bool] = None
+    language_code: Optional[str] = None
 
 
 class BrowseStoriesRequest(BaseModel):
@@ -96,6 +101,7 @@ def get_precreated_stories_endpoint(
     age_group_id: int = Query(1, description="Age group ID"),
     language_id: int = Query(1, description="Language ID"),
     sort_by: str = Query("popular", description="Sort by: 'popular', 'top_rated', 'newest'"),
+    language_code: Optional[str] = Query(None, description="Only stories available in this language"),
     current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
     """
@@ -112,6 +118,7 @@ def get_precreated_stories_endpoint(
             language_id=language_id,
             sort_by=sort_by,
             is_admin=_is_admin_user(current_user),
+            language_code=language_code,
         )
         return JSONResponse(content=data)
     except Exception as exc:
@@ -255,6 +262,7 @@ async def convert_to_story_endpoint(
     age_group_id: int = Form(1),
     category_id: Optional[str] = Form(None),
     language_id: int = Form(1),
+    language_code: Optional[str] = Form(None, description="en, hi, bn, kn, te"),
     voice_id: Optional[str] = Form("luna"),
     accent_id: Optional[str] = Form("us", description="Accent/locale: us, gb, in, au"),
     pdf_page_from: Optional[int] = Form(None, description="PDF 'Page Range' mode: first page to read (1-indexed)"),
@@ -321,6 +329,7 @@ async def convert_to_story_endpoint(
             pdf_page_from=pdf_page_from,
             pdf_page_to=pdf_page_to,
             accent_id=accent_id or "us",
+            language_code=language_code,
         )
         return result
     except ValueError as val_err:
@@ -339,6 +348,7 @@ class CommitStoryRequest(BaseModel):
     voice_tier: Optional[str] = Field(default="standard", description="'standard' or 'deluxe'")
     voice_id: Optional[str] = Field(default="luna", description="Narrator persona: luna, oliver, willow, jasper")
     accent_id: Optional[str] = Field(default="us", description="Accent/locale: us, gb, in, au")
+    language_code: Optional[str] = Field(default=None, description="Play a saved language version: en, hi, bn, kn, te")
 
 
 @router.post("/{story_text_id}/commit", response_model=StoryCommitResponse)
@@ -356,7 +366,18 @@ def commit_story(
     voice_tier = payload.voice_tier if payload else "standard"
     voice_id = payload.voice_id if payload else "luna"
     accent_id = payload.accent_id if payload else "us"
+    language_code = payload.language_code if payload else None
     try:
+        if language_code:
+            from app.services.story_service import get_story_in_language
+            return get_story_in_language(
+                story_text_id=story_text_id,
+                language_code=language_code,
+                voice_id=voice_id or "luna",
+                accent_id=accent_id or "us",
+                user_id=current_user["id"] if current_user else None,
+                is_admin=_is_admin_user(current_user),
+            )
         result = commit_and_narrate_story(
             story_text_id=story_text_id,
             voice_tier=voice_tier,
@@ -419,6 +440,7 @@ class SearchStoriesRequest(BaseModel):
     language_id: int = 1
     allow_ai_generate: bool = False
     category_id: Optional[str] = None  # admin-only: which category to publish a generated story to
+    language_code: Optional[str] = None
 
 
 @router.post("/search", response_model=List[StoryTeaserResponse])
@@ -436,6 +458,7 @@ def search_stories_endpoint(
             allow_ai_generate=payload.allow_ai_generate,
             is_admin=_is_admin_user(current_user),
             category_id=payload.category_id,
+            language_code=payload.language_code,
         )
     except Exception as exc:
         raise HTTPException(
@@ -451,6 +474,8 @@ async def publish_manual_story_endpoint(
     category_id: str = Form(...),
     age_group_id: int = Form(...),
     language_id: int = Form(1),
+    language_code: Optional[str] = Form(None, description="en, hi, bn, kn, te"),
+    extra_languages: Optional[str] = Form(None, description="Comma-separated extra language versions to add, e.g. hi,bn"),
     teaser: Optional[str] = Form(None),
     voice_id: Optional[str] = Form("luna"),
     accent_id: Optional[str] = Form("us", description="Accent/locale: us, gb, in, au"),
@@ -487,6 +512,8 @@ async def publish_manual_story_endpoint(
             accent_id=accent_id or "us",
             cover_image_bytes=cover_bytes,
             cover_image_mime=cover_mime,
+            language_code=language_code,
+            extra_language_codes=[c.strip() for c in (extra_languages or "").split(",") if c.strip()],
         )
     except ValueError as val_err:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(val_err))
@@ -527,6 +554,7 @@ async def edit_story_endpoint(
     full_text: Optional[str] = Form(None),
     teaser: Optional[str] = Form(None),
     remove_cover_image: Optional[bool] = Form(False),
+    language_code: Optional[str] = Form(None, description="Edit this language version instead of the original"),
     cover_image: Optional[UploadFile] = File(None),
     current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
@@ -546,6 +574,9 @@ async def edit_story_endpoint(
         cover_mime = cover_image.content_type
 
     try:
+        if language_code and language_code.strip():
+            from app.services.story_service import update_story_translation
+            return update_story_translation(story_text_id, language_code, title=title, full_text=full_text)
         return update_manual_story(
             story_text_id=story_text_id,
             title=title,
@@ -667,3 +698,57 @@ def rate_story_endpoint(
             detail=f"Rating failed: {str(exc)}"
         )
 
+
+
+
+@router.get("/{story_text_id}/languages")
+def story_languages_endpoint(story_text_id: str):
+    """Languages this story can be played in (original + admin-added versions)."""
+    from app.services.story_service import list_story_languages
+    try:
+        return {"languages": list_story_languages(story_text_id)}
+    except ValueError as val_err:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(val_err))
+
+
+class AddLanguagesRequest(BaseModel):
+    language_codes: List[str]
+    voice_id: Optional[str] = None
+    accent_id: Optional[str] = None
+    force: bool = False
+
+
+@router.post("/{story_text_id}/add-languages")
+def add_story_languages_endpoint(
+    story_text_id: str,
+    payload: AddLanguagesRequest,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+):
+    """Admin only: translate + narrate extra language versions of a published story."""
+    if not _is_admin_user(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only.")
+    from app.services.story_service import add_story_languages, list_story_languages
+    try:
+        result = add_story_languages(story_text_id, payload.language_codes, payload.voice_id, payload.accent_id, payload.force)
+        result["languages"] = list_story_languages(story_text_id)
+        return result
+    except ValueError as val_err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(val_err))
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Adding languages failed: {str(exc)}")
+
+
+@router.get("/{story_text_id}/language-text/{language_code}")
+def story_language_text_endpoint(
+    story_text_id: str,
+    language_code: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+):
+    """Admin only: title + text of one language version, for the edit screen."""
+    if not _is_admin_user(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only.")
+    from app.services.story_service import get_story_translation_detail
+    try:
+        return get_story_translation_detail(story_text_id, language_code)
+    except ValueError as val_err:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(val_err))

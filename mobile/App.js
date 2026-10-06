@@ -55,6 +55,7 @@ export default function App() {
   const [pendingParentTarget, setPendingParentTarget] = useState("profiles"); // 'profiles' | 'login'
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [browseLanguage, setBrowseLanguage] = useState("en"); // story-list language filter (Home + categories)
   const [categoryBackStep, setCategoryBackStep] = useState("home"); // where Back goes from a category page
 
   // Real safe-area bottom inset (gesture bar / home indicator height) instead
@@ -286,6 +287,8 @@ export default function App() {
 
       {currentStep === "home" && (
         <HomeFeedScreen
+          browseLanguage={browseLanguage}
+          onBrowseLanguageChange={setBrowseLanguage}
           activeProfile={activeProfile}
           currentUser={currentUser}
           onPlayStory={(storyData) => {
@@ -303,6 +306,8 @@ export default function App() {
 
       {currentStep === "category" && selectedCategory && (
         <CategoryStoriesScreen
+          browseLanguage={browseLanguage}
+          onBrowseLanguageChange={setBrowseLanguage}
           category={selectedCategory}
           activeProfile={activeProfile}
           currentUser={currentUser}
@@ -349,8 +354,10 @@ export default function App() {
 
       {currentStep === "player" && selectedStory && (
         <PlayerScreen
+          key={`${selectedStory.story_text_id || selectedStory.id}-${selectedStory.language_code || "orig"}`}
           story={selectedStory}
           onBack={() => setCurrentStep(playerOrigin)}
+          onSwitchLanguage={(data) => setSelectedStory(data)}
         />
       )}
 

@@ -17,6 +17,7 @@ import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import SafeAudio from "../utils/safeAudio";
 import StoryLoadingOverlay from "../components/StoryLoadingOverlay";
+import LanguagePicker, { LANGUAGES, languageByCode, openStoryInView } from "../components/LanguagePicker";
 
 // How long to wait after the parent stops typing before we hit the DB.
 // Kept short so search still feels instant.
@@ -144,6 +145,11 @@ function StoryCard({ story, width, height, onPress, busy, showNew, isAdmin, onEd
       <Text style={styles.cardTitle} numberOfLines={3}>
         {story.title}
       </Text>
+      {Array.isArray(story.language_codes) && story.language_codes.length > 1 ? (
+        <View style={styles.langBadge}>
+          <Text style={styles.langBadgeText}>{story.language_codes.map((c) => c.toUpperCase()).join(" · ")}</Text>
+        </View>
+      ) : null}
       {showNew ? (
         <View style={styles.newBadge}>
           <Text style={styles.newBadgeText}>NEW</Text>
@@ -174,6 +180,8 @@ export default function HomeFeedScreen({
   onGoToHome,
   currentUser,
   onOpenCategory,
+  browseLanguage = "en",
+  onBrowseLanguageChange,
 }) {
   const isAdmin = !!currentUser?.is_admin;
 
@@ -210,6 +218,14 @@ export default function HomeFeedScreen({
   const [manualText, setManualText] = useState("");
   const [selectedVoiceId, setSelectedVoiceId] = useState("luna");
   const [selectedAccentId, setSelectedAccentId] = useState("us");
+  const [selectedLanguage, setSelectedLanguage] = useState("en");
+  const [extraLanguages, setExtraLanguages] = useState([]); // extra language versions to publish
+  const [editLanguages, setEditLanguages] = useState([]); // codes this story already has
+  const [editAddLanguages, setEditAddLanguages] = useState([]); // codes to add on save
+  const [editTab, setEditTab] = useState(null); // language code whose text is shown in the edit box
+  const [editTrans, setEditTrans] = useState({}); // code -> { title, text, dirty } for non-original versions
+  const [editTabLoading, setEditTabLoading] = useState(false);
+  const [langProgress, setLangProgress] = useState("");
   const [coverImage, setCoverImage] = useState(null); // { uri, name, type } | null
   const [publishingManual, setPublishingManual] = useState(false);
   const [previewingVoiceId, setPreviewingVoiceId] = useState(null);
@@ -239,7 +255,7 @@ export default function HomeFeedScreen({
 
   useEffect(() => {
     loadStories();
-  }, [activeFilter, activeProfile]);
+  }, [activeFilter, activeProfile, browseLanguage]);
 
   useEffect(() => {
     // Deliberately unfiltered - every active category should be browsable,
@@ -296,14 +312,14 @@ export default function HomeFeedScreen({
       const catLists = await Promise.all(
         cats.map((c) =>
           api
-            .getPrecreatedStories(c.id, ageId, 1, activeFilter)
+            .getPrecreatedStories(c.id, ageId, 1, activeFilter, browseLanguage)
             .then((d) => d || [])
             .catch(() => [])
         )
       );
       // Stories not tagged with a real category show in an "Others" row
       const others = await api
-        .getPrecreatedStories("others", ageId, 1, activeFilter)
+        .getPrecreatedStories("others", ageId, 1, activeFilter, browseLanguage)
         .then((d) => d || [])
         .catch(() => []);
       const rows = cats.map((c, i) => ({ category: c, stories: catLists[i] }));
@@ -311,11 +327,16 @@ export default function HomeFeedScreen({
         rows.push({ category: { id: "others", name: "Others", icon_url: "📦" }, stories: others });
       }
       // A story is shown only once on screen: drop repeats across rows
+      // (same id, or the same title published twice, counts as a repeat)
       const seenIds = new Set();
+      const seenTitles = new Set();
       rows.forEach((r) => {
         r.stories = r.stories.filter((st) => {
+          const titleKey = String(st.title || "").trim().toLowerCase().replace(/\s+/g, " ");
           if (seenIds.has(st.id)) return false;
+          if (titleKey && seenTitles.has(titleKey)) return false;
           seenIds.add(st.id);
+          if (titleKey) seenTitles.add(titleKey);
           return true;
         });
       });
@@ -363,7 +384,7 @@ export default function HomeFeedScreen({
     searchTimerRef.current = setTimeout(async () => {
       try {
         const ageId = activeProfile?.age_group_id || 1;
-        const results = await api.searchStories(q, ageId, 1, false);
+        const results = await api.searchStories(q, ageId, 1, false, null, browseLanguage);
         if (searchTokenRef.current === myToken) {
           setDbResults(results || []);
         }
@@ -400,14 +421,9 @@ export default function HomeFeedScreen({
   // ambient background track is heard.
   async function handleSelectStory(story) {
     if (narratingId) return; // already narrating one, ignore extra taps
-    if (story.has_audio && story.audio_url && story.full_text) {
-      onPlayStory({ ...story, origin: "library" });
-      return;
-    }
     setNarratingId(story.id);
     try {
-      const committed = await api.commitStory(story.id, "standard", "luna");
-      onPlayStory({ ...story, ...committed, origin: "library" });
+      onPlayStory(await openStoryInView(api, story));
     } catch (e) {
       notifyError(e.message || "Couldn't load this story's narration. Please try again.");
     } finally {
@@ -430,6 +446,8 @@ export default function HomeFeedScreen({
     setManualText("");
     setSelectedVoiceId("luna");
     setSelectedAccentId("us");
+    setSelectedLanguage("en");
+    setExtraLanguages([]);
     setCoverImage(null);
   }
 
@@ -517,6 +535,7 @@ export default function HomeFeedScreen({
       formData.append("category_id", generateCategoryId);
       formData.append("age_group_id", String(ageId));
       formData.append("language_id", "1");
+      formData.append("language_code", selectedLanguage);
       formData.append("voice_id", selectedVoiceId || "luna");
       formData.append("accent_id", selectedAccentId || "us");
 
@@ -545,8 +564,29 @@ export default function HomeFeedScreen({
 
       const published = await api.publishManualStory(formData);
       setDbResults((prev) => [published, ...(prev || [])]);
+
+      // Extra language versions: one request per language (translate + narrate),
+      // so each call stays short and the admin sees progress.
+      const langFailures = [];
+      const wanted = extraLanguages.filter((c) => c !== selectedLanguage);
+      for (let i = 0; i < wanted.length; i++) {
+        const code = wanted[i];
+        setLangProgress(`Adding ${languageByCode(code).label} (${i + 1}/${wanted.length})...`);
+        try {
+          const r = await api.addStoryLanguages(published.id, [code]);
+          if (r && r.errors && r.errors.length) langFailures.push(...r.errors);
+        } catch (e) {
+          langFailures.push(`${languageByCode(code).label}: ${e.message}`);
+        }
+      }
+      setLangProgress("");
+
       closeGenerateModal();
       loadStories();
+      if (langFailures.length) {
+        notifyError("Story published, but some languages failed:\n" + langFailures.join("\n"));
+        return;
+      }
 
       if (coverImage) {
         if (published.cover_image_upload_failed) {
@@ -596,6 +636,10 @@ export default function HomeFeedScreen({
     setEditCoverImage(null);
     setEditCoverImageUrl(story.cover_image_url || null);
     setEditRemoveCover(false);
+    setEditLanguages([]);
+    setEditAddLanguages([]);
+    setEditTab(null);
+    setEditTrans({});
     setShowEditModal(true);
     setLoadingEdit(true);
     try {
@@ -603,6 +647,12 @@ export default function HomeFeedScreen({
       setEditTitle(detail.title || "");
       setEditText(detail.full_text || "");
       setEditCoverImageUrl(detail.cover_image_url || null);
+      try {
+        const lr = await api.getStoryLanguages(story.id);
+        const codes = ((lr && lr.languages) || []).map((l) => l.code);
+        setEditLanguages(codes);
+        setEditTab(codes[0] || "en");
+      } catch (e) {}
     } catch (e) {
       notifyError(e.message || "Couldn't load this story for editing. Please try again.");
       setShowEditModal(false);
@@ -619,6 +669,58 @@ export default function HomeFeedScreen({
     setEditCoverImage(null);
     setEditCoverImageUrl(null);
     setEditRemoveCover(false);
+    setEditLanguages([]);
+    setEditAddLanguages([]);
+    setEditTab(null);
+    setEditTrans({});
+  }
+
+  const editOrigCode = editLanguages[0] || "en";
+  const editIsOrig = !editTab || editTab === editOrigCode;
+
+  async function loadEditTranslation(code, force = false) {
+    if (!force && editTrans[code]) return;
+    setEditTabLoading(true);
+    try {
+      const d = await api.getStoryLanguageText(editingStoryId, code);
+      setEditTrans((prev) => ({ ...prev, [code]: { title: d.title || "", text: d.full_text || "", dirty: false } }));
+    } catch (e) {
+      notifyError(e.message || "Couldn't load that language version.");
+    } finally {
+      setEditTabLoading(false);
+    }
+  }
+
+  function handleEditTab(code) {
+    setEditTab(code);
+    if (code !== editOrigCode) loadEditTranslation(code);
+  }
+
+  function setTransField(code, field, value) {
+    setEditTrans((prev) => ({ ...prev, [code]: { ...(prev[code] || { title: "", text: "" }), [field]: value, dirty: true } }));
+  }
+
+  function handleRetranslate(code) {
+    const label = languageByCode(code).label;
+    const go = async () => {
+      setEditTabLoading(true);
+      try {
+        const r = await api.addStoryLanguages(editingStoryId, [code], true);
+        if (r && r.errors && r.errors.length) notifyError(r.errors.join("\n"));
+        await loadEditTranslation(code, true);
+        notifyInfo("Done", `${label} was translated again from the main text.`);
+      } catch (e) {
+        notifyError(e.message || "Re-translate failed.");
+      } finally {
+        setEditTabLoading(false);
+      }
+    };
+    const msg = `This replaces the ${label} version (including any edits you made there) with a fresh translation of the main text, and re-records the audio (about ₹5).`;
+    if (Platform.OS === "web") {
+      if (window.confirm(msg)) go();
+    } else {
+      Alert.alert(`Re-translate ${label}?`, msg, [{ text: "Cancel", style: "cancel" }, { text: "Re-translate", onPress: go }]);
+    }
   }
 
   async function handlePickEditCoverImage() {
@@ -686,6 +788,35 @@ export default function HomeFeedScreen({
 
       const updated = await api.editStory(editingStoryId, formData);
 
+      // Other-language versions are never touched by editing the main text;
+      // only the ones edited on their own tab are saved (and re-narrated).
+      const addFailures = [];
+      const dirtyCodes = Object.keys(editTrans).filter((c) => editTrans[c] && editTrans[c].dirty);
+      for (let i = 0; i < dirtyCodes.length; i++) {
+        const c = dirtyCodes[i];
+        setLangProgress(`Saving ${languageByCode(c).label}...`);
+        try {
+          const fd = new FormData();
+          fd.append("language_code", c);
+          fd.append("title", (editTrans[c].title || "").trim());
+          fd.append("full_text", (editTrans[c].text || "").trim());
+          await api.editStory(editingStoryId, fd);
+        } catch (e) {
+          addFailures.push(`${languageByCode(c).label}: ${e.message}`);
+        }
+      }
+      const toAdd = editAddLanguages.slice();
+      for (let i = 0; i < toAdd.length; i++) {
+        setLangProgress(`Adding ${languageByCode(toAdd[i]).label} (${i + 1}/${toAdd.length})...`);
+        try {
+          const r = await api.addStoryLanguages(editingStoryId, [toAdd[i]]);
+          if (r && r.errors && r.errors.length) addFailures.push(...r.errors);
+        } catch (e) {
+          addFailures.push(`${languageByCode(toAdd[i]).label}: ${e.message}`);
+        }
+      }
+      setLangProgress("");
+
       const applyUpdate = (list) =>
         list ? list.map((s) => (s.id === editingStoryId ? { ...s, ...updated } : s)) : list;
       setStories((prev) => applyUpdate(prev));
@@ -693,6 +824,11 @@ export default function HomeFeedScreen({
       setDbResults((prev) => applyUpdate(prev));
 
       closeEditModal();
+
+      if (addFailures.length) {
+        notifyError("Story saved, but some languages failed:\n" + addFailures.join("\n"));
+        return;
+      }
 
       if (editCoverImage) {
         if (updated.cover_image_upload_failed) {
@@ -788,6 +924,12 @@ export default function HomeFeedScreen({
         </TouchableOpacity>
       )}
 
+      {onBrowseLanguageChange && (
+        <View style={{ marginHorizontal: 16, marginBottom: 8, zIndex: 20 }}>
+          <LanguagePicker value={browseLanguage} onChange={onBrowseLanguageChange} />
+        </View>
+      )}
+
       <ScrollView contentContainerStyle={styles.listContent}>
         {!searchQuery && loading && feedRows.length === 0 && (
           <ActivityIndicator size="large" color="#f5a623" style={{ marginTop: 50 }} />
@@ -795,7 +937,11 @@ export default function HomeFeedScreen({
 
         {!searchQuery && !loading && feedRows.length === 0 && (
           <View style={{ alignItems: "center", marginTop: 40 }}>
-            <Text style={styles.emptyText}>No stories yet for this age. Check back soon!</Text>
+            <Text style={styles.emptyText}>
+              {browseLanguage !== "en"
+                ? `No stories in ${languageByCode(browseLanguage).label} yet. Check back soon!`
+                : "No stories yet for this age. Check back soon!"}
+            </Text>
             <TouchableOpacity style={styles.chip} onPress={loadStories}>
               <Text style={styles.chipText}>Retry</Text>
             </TouchableOpacity>
@@ -1061,7 +1207,36 @@ export default function HomeFeedScreen({
                     </TouchableOpacity>
                   )}
 
-                  {accents.length > 0 && (
+                  <Text style={styles.sectionLabel}>Story language</Text>
+                  <Text style={styles.sectionHint}>
+                    Text in another language is translated automatically, then narrated in the language you pick.
+                  </Text>
+                  <LanguagePicker value={selectedLanguage} onChange={setSelectedLanguage} style={{ marginBottom: 10 }} />
+
+                  <Text style={styles.sectionLabel}>Also publish in (optional)</Text>
+                  <Text style={styles.sectionHint}>
+                    Listeners can switch language inside the player. Each extra language is translated and narrated once.
+                  </Text>
+                  <View style={styles.pickerRow}>
+                    {LANGUAGES.filter((l) => l.code !== selectedLanguage).map((l) => {
+                      const on = extraLanguages.includes(l.code);
+                      return (
+                        <TouchableOpacity
+                          key={l.code}
+                          style={[styles.pickerChip, on && styles.pickerChipActive]}
+                          onPress={() =>
+                            setExtraLanguages((prev) => (on ? prev.filter((c) => c !== l.code) : [...prev, l.code]))
+                          }
+                        >
+                          <Text style={[styles.pickerChipText, on && styles.pickerChipTextActive]}>
+                            {on ? "✓ " : ""}{l.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {selectedLanguage === "en" && accents.length > 0 && (
                     <>
                       <Text style={styles.sectionLabel}>Accent</Text>
                       <Text style={styles.sectionHint}>
@@ -1137,7 +1312,11 @@ export default function HomeFeedScreen({
                     onPress={handlePublishManual}
                   >
                     {publishingManual ? (
-                      <ActivityIndicator size="small" color="#0b0e20" />
+                      langProgress ? (
+                        <Text style={styles.modalGenerateText}>{langProgress}</Text>
+                      ) : (
+                        <ActivityIndicator size="small" color="#0b0e20" />
+                      )
                     ) : (
                       <Text style={styles.modalGenerateText}>Publish</Text>
                     )}
@@ -1159,30 +1338,105 @@ export default function HomeFeedScreen({
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Edit Story</Text>
             <Text style={styles.modalSubtitle}>
-              Update the story text or cover picture. Narrator voice, accent, and category stay
-              the same as when it was published.
+              Update the story text or cover picture. Other languages are never deleted when you edit.
+              Narrator voice, accent, and category stay the same as when it was published.
             </Text>
             {loadingEdit ? (
               <ActivityIndicator size="large" color="#f5a623" style={{ marginVertical: 30 }} />
             ) : (
               <>
                 <ScrollView style={styles.modalCategoryList}>
-                  <TextInput
-                    style={styles.newCategoryInput}
-                    placeholder="Story title..."
-                    placeholderTextColor="rgba(255,255,255,0.4)"
-                    value={editTitle}
-                    onChangeText={setEditTitle}
-                  />
-                  <TextInput
-                    style={[styles.newCategoryInput, styles.manualTextArea]}
-                    placeholder="Full story text..."
-                    placeholderTextColor="rgba(255,255,255,0.4)"
-                    value={editText}
-                    onChangeText={setEditText}
-                    multiline
-                    textAlignVertical="top"
-                  />
+                  {editLanguages.length > 1 && (
+                    <View style={styles.pickerRow}>
+                      {editLanguages.map((c) => {
+                        const on = (editTab || editOrigCode) === c;
+                        return (
+                          <TouchableOpacity
+                            key={c}
+                            style={[styles.pickerChip, on && styles.pickerChipActive]}
+                            onPress={() => handleEditTab(c)}
+                          >
+                            <Text style={[styles.pickerChipText, on && styles.pickerChipTextActive]}>
+                              {languageByCode(c).label}{c === editOrigCode ? " (main)" : ""}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                  {editTabLoading ? (
+                    <ActivityIndicator size="small" color="#f5a623" style={{ marginVertical: 20 }} />
+                  ) : editIsOrig ? (
+                    <>
+                      <TextInput
+                        style={styles.newCategoryInput}
+                        placeholder="Story title..."
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        value={editTitle}
+                        onChangeText={setEditTitle}
+                      />
+                      <TextInput
+                        style={[styles.newCategoryInput, styles.manualTextArea]}
+                        placeholder="Full story text..."
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        value={editText}
+                        onChangeText={setEditText}
+                        multiline
+                        textAlignVertical="top"
+                      />
+                      {editLanguages.length > 1 && (
+                        <Text style={styles.sectionHint}>
+                          Changing the main text does not change the other languages. Edit each one on its own tab, or use "Re-translate" there.
+                        </Text>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <TextInput
+                        style={styles.newCategoryInput}
+                        placeholder="Title..."
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        value={(editTrans[editTab] || {}).title || ""}
+                        onChangeText={(v) => setTransField(editTab, "title", v)}
+                      />
+                      <TextInput
+                        style={[styles.newCategoryInput, styles.manualTextArea]}
+                        placeholder="Full story text..."
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        value={(editTrans[editTab] || {}).text || ""}
+                        onChangeText={(v) => setTransField(editTab, "text", v)}
+                        multiline
+                        textAlignVertical="top"
+                      />
+                      <TouchableOpacity style={styles.addCategoryRow} onPress={() => handleRetranslate(editTab)}>
+                        <Text style={styles.addCategoryText}>🔄 Re-translate from main text (~₹5)</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+
+                  {LANGUAGES.some((l) => !editLanguages.includes(l.code)) && (
+                    <>
+                      <Text style={styles.sectionLabel}>Add another language</Text>
+                      <View style={styles.pickerRow}>
+                        {LANGUAGES.filter((l) => !editLanguages.includes(l.code)).map((l) => {
+                          const on = editAddLanguages.includes(l.code);
+                          return (
+                            <TouchableOpacity
+                              key={l.code}
+                              style={[styles.pickerChip, on && styles.pickerChipActive]}
+                              onPress={() =>
+                                setEditAddLanguages((prev) => (on ? prev.filter((c) => c !== l.code) : [...prev, l.code]))
+                              }
+                            >
+                              <Text style={[styles.pickerChipText, on && styles.pickerChipTextActive]}>
+                                {on ? "✓ " : "+ "}{l.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </>
+                  )}
 
                   <Text style={styles.sectionLabel}>Cover Picture</Text>
                   {editCoverImage ? (
@@ -1238,7 +1492,11 @@ export default function HomeFeedScreen({
                     onPress={handleSaveEdit}
                   >
                     {savingEdit ? (
-                      <ActivityIndicator size="small" color="#0b0e20" />
+                      langProgress ? (
+                        <Text style={styles.modalGenerateText}>{langProgress}</Text>
+                      ) : (
+                        <ActivityIndicator size="small" color="#0b0e20" />
+                      )
                     ) : (
                       <Text style={styles.modalGenerateText}>Save Changes</Text>
                     )}
@@ -1791,6 +2049,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
+  langBadge: {
+    position: "absolute",
+    right: 7,
+    bottom: 7,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  langBadgeText: { color: "#f5a623", fontSize: 9, fontWeight: "900", letterSpacing: 0.4 },
   newBadgeText: { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 0.5 },
   busy: {
     ...StyleSheet.absoluteFillObject,

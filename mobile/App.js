@@ -25,6 +25,8 @@ import ParentalGateModal from "./src/components/ParentalGateModal";
 import SubscriptionModal from "./src/components/SubscriptionModal";
 import StarryBackground from "./src/components/StarryBackground";
 import NotificationBell from "./src/components/NotificationBell";
+import SLogo from "./src/components/SLogo";
+import StoryLandSplash from "./src/components/StoryLandSplash";
 
 function getInitialAuthFlow() {
   if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -87,11 +89,11 @@ export default function App() {
     loadSavedSession(hasResetToken);
   }, []);
 
-  async function loadSavedSession(hasResetToken = false) {
+  async function loadSavedSession(hasResetToken = false, moveToProfiles = true) {
     const user = await authStorage.getUser();
     if (user) {
       setCurrentUser(user);
-      if (!hasResetToken && initialAuth.step !== "reset") {
+      if (moveToProfiles && !hasResetToken && initialAuth.step !== "reset") {
         setCurrentStep("age");
       }
       try {
@@ -187,7 +189,7 @@ export default function App() {
   const [initialSearchQuery, setInitialSearchQuery] = useState("");
 
   const isPlayer = currentStep === "player";
-  const isAuthScreen = ["login", "register", "forgot", "profiles"].includes(currentStep);
+  const isAuthScreen = ["login", "register", "forgot", "profiles", "splash"].includes(currentStep);
   const isPremiumUser = ["premium", "premium_monthly", "premium_annual", "admin_vip"].includes(
     currentUser?.subscription_tier
   );
@@ -209,9 +211,7 @@ export default function App() {
             onPress={() => setCurrentStep("age")}
             activeOpacity={0.8}
           >
-            <View style={styles.sBadge}>
-              <Text style={styles.sBadgeText}>S</Text>
-            </View>
+            <SLogo size="sm" />
           </TouchableOpacity>
 
           <View style={styles.headerRightRow}>
@@ -361,13 +361,15 @@ export default function App() {
         />
       )}
 
+      {currentStep === "splash" && <StoryLandSplash onDone={() => setCurrentStep("age")} />}
+
       {/* Auth & Profile Screens */}
       {currentStep === "login" && (
         <LoginScreen
           onLoginSuccess={async (user) => {
             setCurrentUser(user);
-            await loadSavedSession();
-            setCurrentStep("age");
+            setCurrentStep("splash"); // STORY intro first (the profile picker must not flash before it)
+            await loadSavedSession(false, false);
           }}
           onGoToRegister={() => setCurrentStep("register")}
           onGoToForgot={() => setCurrentStep("forgot")}
@@ -380,8 +382,8 @@ export default function App() {
           initialTab="signup"
           onLoginSuccess={async (user) => {
             setCurrentUser(user);
-            await loadSavedSession();
-            setCurrentStep("age");
+            setCurrentStep("splash"); // STORY intro first (the profile picker must not flash before it)
+            await loadSavedSession(false, false);
           }}
           onGoToForgot={() => setCurrentStep("forgot")}
           onBack={() => setCurrentStep("login")}

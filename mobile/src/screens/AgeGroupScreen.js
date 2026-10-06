@@ -11,6 +11,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { colors } from "../theme/colors";
 import { api } from "../api/client";
+import SLogo from "../components/SLogo";
 
 export default function AgeGroupScreen({
   currentUser,
@@ -259,9 +260,7 @@ export default function AgeGroupScreen({
 
       {/* Top-left: S logo (like the N on Netflix) */}
       <View style={styles.logoWrap}>
-        <View style={styles.logoBadge}>
-          <Text style={styles.logoS}>S</Text>
-        </View>
+        <SLogo size="md" />
       </View>
 
       {/* Top-right: Admin link (admins only). Bell and Log Out live inside the child profile. */}

@@ -14,6 +14,7 @@ import {
 import { colors } from "../theme/colors";
 import { api } from "../api/client";
 import { authStorage } from "../api/authStorage";
+import SLogo from "../components/SLogo";
 
 // Unified auth screen: hero illustration + a single sheet with Log In / Sign Up
 // as switchable tabs (no screen navigation between them). All Login and Sign Up
@@ -116,7 +117,7 @@ export default function LoginScreen({
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* S logo + title (look only) */}
       <View style={styles.hero}>
-        <Text style={styles.logoS}>S</Text>
+        <SLogo size="lg" />
       </View>
 
       <View style={styles.sheet}>
@@ -355,60 +356,57 @@ export default function LoginScreen({
 }
 
 const RED = "#e50914";
-const GOLD = "#f5a623";
-const LINE = "rgba(255,255,255,0.14)";
+const GOLD = "#f5a623"; // buttons (same as the rest of the app)
+const WHITE = "#ffffff";
+const LINE = "rgba(255,255,255,0.12)";
+const HOME_BG = "#05060c"; // same ground as the Home screen
+const FIELD = "#14151d";
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: HOME_BG,
   },
   content: {
-    padding: 28,
-    paddingTop: 64,
+    padding: 24,
+    paddingTop: 60,
     paddingBottom: 40,
   },
   hero: {
-    alignItems: "flex-start",
-    marginBottom: 14,
-  },
-  logoS: {
-    color: RED,
-    fontSize: 64,
-    lineHeight: 70,
-    fontWeight: "900",
-    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    alignItems: "center",
+    marginBottom: 16,
   },
   sheet: {},
   sheetTitle: {
     color: "#fff",
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "800",
+    textAlign: "center",
     marginBottom: 6,
   },
   sheetSubtitle: {
-    color: "#9a9db0",
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 22,
+    color: "#8d90a0",
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+    marginBottom: 20,
   },
 
   tabsRow: {
     flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: LINE,
-    marginBottom: 24,
+    backgroundColor: "#12131b",
+    borderRadius: 14,
+    padding: 3,
+    marginBottom: 20,
   },
   tabBtn: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 11,
+    borderRadius: 11,
     alignItems: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-    marginBottom: -1,
   },
   tabBtnActive: {
-    borderBottomColor: RED,
+    backgroundColor: "#232430",
   },
   tabText: {
     color: "#8d90a0",
@@ -421,56 +419,59 @@ const styles = StyleSheet.create({
 
   form: {},
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
-    color: "#9a9db0",
+    color: "#8d90a0",
     fontSize: 12,
     fontWeight: "600",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   labelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   forgotLink: {
-    color: GOLD,
+    color: WHITE,
     fontSize: 13,
     fontWeight: "700",
   },
   input: {
-    backgroundColor: "transparent",
-    borderBottomWidth: 1,
-    borderBottomColor: LINE,
-    paddingHorizontal: 0,
-    paddingVertical: 10,
+    backgroundColor: FIELD,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: LINE,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
     color: "#fff",
-    fontSize: 16,
+    fontSize: 15,
   },
   inputFocused: {
-    borderBottomColor: RED,
+    borderColor: "#ffffff",
   },
   passwordContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: LINE,
+    backgroundColor: FIELD,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: LINE,
   },
   passwordInput: {
     flex: 1,
-    paddingHorizontal: 0,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
     color: "#fff",
-    fontSize: 16,
+    fontSize: 15,
   },
   eyeBtn: {
-    paddingLeft: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   eyeIcon: {
-    color: GOLD,
+    color: WHITE,
     fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0.8,
@@ -479,12 +480,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 18,
   },
   checkbox: {
     width: 22,
     height: 22,
-    borderRadius: 4,
+    borderRadius: 6,
     borderWidth: 2,
     borderColor: "#6b6e80",
     alignItems: "center",
@@ -492,23 +493,25 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   checkboxChecked: {
-    backgroundColor: RED,
-    borderColor: RED,
+    backgroundColor: FIELD,
+    borderColor: WHITE,
   },
   checkmark: {
-    color: "#fff",
+    color: WHITE,
     fontSize: 14,
     fontWeight: "700",
   },
   checkboxLabel: {
     flex: 1,
-    color: "#9a9db0",
+    color: "#8d90a0",
     fontSize: 13,
     lineHeight: 18,
   },
   submitBtn: {
-    backgroundColor: RED,
-    borderRadius: 8,
+    backgroundColor: FIELD, // same as the email / password fields
+    borderWidth: 1,
+    borderColor: LINE,
+    borderRadius: 14,
     paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
@@ -516,7 +519,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   submitText: {
-    color: "#fff",
+    color: WHITE,
     fontSize: 16,
     fontWeight: "800",
   },
@@ -530,7 +533,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   signUpLink: {
-    color: "#fff",
+    color: WHITE,
     fontSize: 14,
     fontWeight: "700",
   },
@@ -539,7 +542,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(239, 68, 68, 0.3)",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 16,
   },
   errorText: {
@@ -558,8 +561,8 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "100%",
     maxWidth: 340,
-    backgroundColor: "#14151d",
-    borderRadius: 18,
+    backgroundColor: FIELD,
+    borderRadius: 20,
     padding: 28,
     alignItems: "center",
     borderWidth: 1,
@@ -584,13 +587,13 @@ const styles = StyleSheet.create({
   },
   modalProceedBtn: {
     width: "100%",
-    backgroundColor: RED,
+    backgroundColor: "#232430",
     paddingVertical: 14,
-    borderRadius: 8,
+    borderRadius: 14,
     alignItems: "center",
   },
   modalProceedText: {
-    color: "#fff",
+    color: WHITE,
     fontSize: 15,
     fontWeight: "700",
   },

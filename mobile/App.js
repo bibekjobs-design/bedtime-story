@@ -489,7 +489,12 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: "100%",
     alignSelf: "stretch",
-    minHeight: Platform.OS === "web" ? "100vh" : "100%",
+    // Web: exactly the visible screen height (dvh follows the phone browser's
+    // address bar). A taller-than-screen box pushed the bottom of the list and
+    // the nav below the fold, so Home could not be scrolled to its end.
+    ...(Platform.OS === "web"
+      ? { height: "100dvh", maxHeight: "100dvh", minHeight: 0 }
+      : { minHeight: "100%" }),
     paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight || 28) + 6 : 0,
   },
   topHeader: {

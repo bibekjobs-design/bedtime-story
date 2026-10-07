@@ -139,12 +139,14 @@ def _voice_name_for_locale(base_voice_name: str, locale: str) -> str:
 # Indian-language narration. Hindi / Bengali / Kannada use Google's Chirp3-HD
 # voices (same persona names as English: Aoede=Luna, Charon=Oliver, Kore=Willow,
 # Puck=Jasper) with a Wavenet/Neural2 fallback. Odia is NOT in Chirp3-HD, so it
-# is not offered.
+# is handled by Gemini-TTS instead.
 INDIAN_LANGS = {
     "hi": {"locale": "hi-IN", "fallback_f": "hi-IN-Neural2-A", "fallback_m": "hi-IN-Neural2-B"},
     "bn": {"locale": "bn-IN", "fallback_f": "bn-IN-Wavenet-A", "fallback_m": "bn-IN-Wavenet-B"},
     "kn": {"locale": "kn-IN", "fallback_f": "kn-IN-Wavenet-A", "fallback_m": "kn-IN-Wavenet-B"},
     "te": {"locale": "te-IN", "fallback_f": "te-IN-Standard-A", "fallback_m": "te-IN-Standard-B"},
+    # Odia: only Gemini-TTS has it (or-IN, GA). Tries flash first, then pro.
+    "or": {"locale": "or-IN", "gemini": True},
 }
 GEMINI_TTS_MODEL = "gemini-2.5-flash-tts"
 GEMINI_VOICE_FOR_PERSONA = {"luna": "Aoede", "oliver": "Charon", "willow": "Kore", "jasper": "Puck"}
@@ -192,7 +194,9 @@ def synthesize_story_audio(
         cfg = INDIAN_LANGS[lang]
         locale = cfg["locale"]
         if cfg.get("gemini"):
-            candidates.append((locale, GEMINI_VOICE_FOR_PERSONA.get(voice_id, "Aoede"), GEMINI_TTS_MODEL, True))
+            _gv = GEMINI_VOICE_FOR_PERSONA.get(voice_id, "Aoede")
+            candidates.append((locale, _gv, GEMINI_TTS_MODEL, True))
+            candidates.append((locale, _gv, "gemini-2.5-pro-tts", True))
             max_chars = 700  # Odia is 3 bytes/char in UTF-8; Gemini-TTS limit is 4000 bytes
         else:
             persona = (voice_meta.get("voice_name") or "en-US-Chirp3-HD-Aoede").split("-", 2)[-1]

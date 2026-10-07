@@ -42,7 +42,7 @@ function formatDate(value) {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
-export default function NotificationBell({ userKey, onAction }) {
+export default function NotificationBell({ userKey, onAction, hideButton = false, openSignal = 0, onUnreadChange }) {
   const [items, setItems] = useState([]);
   const [seenIds, setSeenIds] = useState([]);
   const [open, setOpen] = useState(false);
@@ -116,6 +116,16 @@ export default function NotificationBell({ userKey, onAction }) {
     AsyncStorage.setItem(SEEN_KEY, JSON.stringify(merged)).catch(() => {});
   }
 
+  // Menu mode: the header menu opens the sheet (openSignal goes up) and reads the unread count.
+  useEffect(() => {
+    if (openSignal > 0) openSheet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSignal]);
+  useEffect(() => {
+    if (onUnreadChange) onUnreadChange(unreadCount);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unreadCount]);
+
   function handleAction(action) {
     setOpen(false);
     if (onAction) onAction(action);
@@ -123,6 +133,7 @@ export default function NotificationBell({ userKey, onAction }) {
 
   return (
     <>
+      {!hideButton && (
       <TouchableOpacity style={styles.bellBtn} onPress={openSheet} activeOpacity={0.8}>
         <Text style={styles.bellIcon}>🔔</Text>
         {unreadCount > 0 && (
@@ -131,6 +142,7 @@ export default function NotificationBell({ userKey, onAction }) {
           </View>
         )}
       </TouchableOpacity>
+      )}
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <View style={styles.backdrop}>

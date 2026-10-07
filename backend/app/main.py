@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.routers import lookups, stories, auth, profiles, voice_clones, subscriptions, admin, history, announcements
+from app.routers import lookups, stories, auth, profiles, voice_clones, subscriptions, admin, history, announcements, privacy
 app.include_router(lookups.router)
 app.include_router(stories.router)
 app.include_router(auth.router)
@@ -29,6 +29,7 @@ app.include_router(subscriptions.router)
 app.include_router(admin.router)
 app.include_router(history.router)
 app.include_router(announcements.router)
+app.include_router(privacy.router)
 
 
 @app.on_event("startup")
@@ -47,6 +48,25 @@ def prewarm_story_cache():
         print("Story library cache pre-warmed for all age groups in parallel (0ms ready).")
     except Exception as e:
         print(f"Pre-warm note: {e}")
+
+
+@app.on_event("startup")
+def start_voice_clone_cleanup():
+    """Every hour, delete voice clones whose 10-day window is over."""
+    import threading, time
+
+    def loop():
+        while True:
+            try:
+                from app.services.voice_clone_service import purge_expired_voice_clones
+                n = purge_expired_voice_clones()
+                if n:
+                    print(f"[privacy] removed {n} expired voice clone(s)")
+            except Exception as e:
+                print(f"[privacy] cleanup note: {e}")
+            time.sleep(3600)
+
+    threading.Thread(target=loop, daemon=True).start()
 
 
 @app.get("/")

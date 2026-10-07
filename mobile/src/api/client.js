@@ -395,6 +395,11 @@ export const api = {
     }
     return await res.json();
   },
+  deleteAccount: (password) =>
+    request("/api/privacy/delete-account", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
   deleteVoiceClone: (id) =>
     request(`/api/voice-clones/${id}`, {
       method: "DELETE",

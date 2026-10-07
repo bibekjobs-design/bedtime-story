@@ -164,7 +164,7 @@ def enforce_story_length(
 # ---------------------------------------------------------------------------
 # Multi-language support (English + Indian languages)
 # ---------------------------------------------------------------------------
-TRANSLATION_SUFFIXES = ("hi", "bn", "kn", "te", "or")  # "or" kept so old Odia rows are still recognised
+TRANSLATION_SUFFIXES = ("hi", "bn", "kn", "te", "or")  # "or" = Odia (Gemini-TTS voice)
 
 SUPPORTED_LANGUAGES = {
     "en": {"label": "English", "script": [(0x0041, 0x024F)], "word_factor": 1.0},
@@ -172,6 +172,7 @@ SUPPORTED_LANGUAGES = {
     "bn": {"label": "Bengali", "script": [(0x0980, 0x09FF)], "word_factor": 0.9},
     "kn": {"label": "Kannada", "script": [(0x0C80, 0x0CFF)], "word_factor": 0.8},
     "te": {"label": "Telugu", "script": [(0x0C00, 0x0C7F)], "word_factor": 0.85},
+    "or": {"label": "Odia", "script": [(0x0B00, 0x0B7F)], "word_factor": 0.8},
 }
 
 

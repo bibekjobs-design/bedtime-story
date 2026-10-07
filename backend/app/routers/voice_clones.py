@@ -6,7 +6,9 @@ from app.db import get_supabase
 from app.auth import get_current_user
 from app.services.voice_clone_service import (
     register_parent_voice_clone,
-    narrate_story_with_voice_clone
+    narrate_story_with_voice_clone,
+    delete_clone_everywhere,
+    purge_expired_voice_clones,
 )
 
 router = APIRouter(prefix="/api/voice-clones", tags=["Voice Clones"])
@@ -21,6 +23,10 @@ class NarrateClonedRequest(BaseModel):
 @router.get("/")
 def list_voice_clones(current_user: dict = Depends(get_current_user)):
     """Lists all voice clones registered by the authenticated parent."""
+    try:
+        purge_expired_voice_clones()
+    except Exception as e:
+        print(f"[voice clones] purge on list failed: {e}")
     supabase = get_supabase()
     res = (
         supabase.table("voice_clones")
@@ -52,6 +58,7 @@ def list_voice_clones(current_user: dict = Depends(get_current_user)):
 async def upload_voice_clone(
     label: str = Form(..., description="e.g. 'Mom bedtime voice' or 'Dad'"),
     audio_file: UploadFile = File(...),
+    consent: str = Form("", description="Must be 'true': the parent agrees to the voice-cloning terms"),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -69,6 +76,12 @@ async def upload_voice_clone(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Voice cloning is a Super feature. Upgrade to the ₹219/month Super plan to clone your voice for bedtime stories!"
+        )
+
+    if (consent or "").strip().lower() != "true":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please confirm the voice-cloning consent before saving your voice."
         )
 
     audio_bytes = await audio_file.read()
@@ -146,12 +159,7 @@ def delete_voice_clone(clone_id: str, current_user: dict = Depends(get_current_u
         # Idempotent return if already deleted
         return
 
-    supabase.table("voice_clones").delete().eq("id", clone_id).execute()
-    try:
-        supabase.storage.from_("story-audio").remove([
-            f"voice-samples/{current_user['id']}/{clone_id}.webm",
-            f"voice-samples/{current_user['id']}/{clone_id}.mp3"
-        ])
-    except Exception:
-        pass
+    full = supabase.table("voice_clones").select("*").eq("id", clone_id).execute().data
+    if full:
+        delete_clone_everywhere(supabase, full[0])
     return

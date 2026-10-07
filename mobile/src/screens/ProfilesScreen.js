@@ -10,11 +10,22 @@ import {
   Alert,
   Modal,
   Platform,
+  Linking,
 } from "react-native";
 import { colors } from "../theme/colors";
 import { api } from "../api/client";
 import { authStorage } from "../api/authStorage";
 import VoiceRecorderModal from "../components/VoiceRecorderModal";
+
+// "· deleted in 7 days": every cloned voice is removed automatically 10 days after it is made.
+function daysLeftText(expiresAt) {
+  if (!expiresAt) return "";
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (isNaN(ms)) return "";
+  const days = Math.ceil(ms / 86400000);
+  if (days <= 0) return " · deleting soon";
+  return ` · auto-deleted in ${days} day${days === 1 ? "" : "s"}`;
+}
 
 export default function ProfilesScreen({
   user,
@@ -579,7 +590,9 @@ export default function ProfilesScreen({
                 </View>
                 <View style={styles.profileDetails}>
                   <Text style={styles.childName}>{vc.display_name || "Parent Voice"}</Text>
-                  <Text style={styles.profileMeta}>Status: Ready ✅</Text>
+                  <Text style={styles.profileMeta}>
+                    Ready ✅{daysLeftText(vc.expires_at)}
+                  </Text>
                 </View>
                 <TouchableOpacity
                   style={styles.sampleListenBtn}
@@ -588,6 +601,16 @@ export default function ProfilesScreen({
                   <Text style={styles.sampleListenText}>
                     {samplePlayingId === vc.id ? "⏸️ Pause" : "▶️ Sample"}
                   </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.sampleListenBtn}
+                  onPress={() => {
+                    if (!vc.sample_audio_url) return;
+                    if (Platform.OS === "web" && typeof window !== "undefined") window.open(vc.sample_audio_url, "_blank");
+                    else Linking.openURL(vc.sample_audio_url).catch(() => {});
+                  }}
+                >
+                  <Text style={styles.sampleListenText}>⬇️ Save</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.deleteBtn}

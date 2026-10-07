@@ -9,6 +9,7 @@ export const LANGUAGES = [
   { code: "bn", label: "Bengali", native: "বাংলা", wordFactor: 0.9 },
   { code: "kn", label: "Kannada", native: "ಕನ್ನಡ", wordFactor: 0.8 },
   { code: "te", label: "Telugu", native: "తెలుగు", wordFactor: 0.85 },
+  { code: "or", label: "Odia", native: "ଓଡ଼ିଆ", wordFactor: 0.8 },
 ];
 
 export function languageByCode(code) {

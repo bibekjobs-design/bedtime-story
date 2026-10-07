@@ -10,6 +10,9 @@ from app.services.usage_service import check_and_increment_usage
 
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1"
 
+# Privacy: a parent voice clone (and its recording) is deleted this many days after it is created.
+VOICE_CLONE_RETENTION_DAYS = 10
+
 # --- ElevenLabs narration model: ALWAYS the cheapest one ---------------------
 # Single source of truth for EVERY ElevenLabs text-to-speech call in the app
 # (cloned-voice narration for real users, admin test narration, and the
@@ -106,6 +109,7 @@ async def register_parent_voice_clone(
         "provider": "elevenlabs",
         "provider_voice_id": provider_voice_id,
         "consent_given_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + __import__("datetime").timedelta(days=VOICE_CLONE_RETENTION_DAYS)).isoformat(),
         "status": status,
     }
     insert_res = supabase.table("voice_clones").insert(record).execute()
@@ -364,3 +368,37 @@ async def narrate_story_with_voice_clone(
         "ambient_sound": ambient_sound,
         "cached": False,
     }
+
+
+
+def delete_clone_everywhere(supabase, clone: dict) -> None:
+    """Removes a clone from ElevenLabs, deletes the stored sample and the database row."""
+    import httpx as _httpx
+    vid = clone.get("provider_voice_id") or ""
+    if settings.ELEVENLABS_API_KEY and vid and not vid.startswith(("simulated_", "mock_")):
+        try:
+            _httpx.delete(f"{ELEVENLABS_API_URL}/voices/{vid}", headers={"xi-api-key": settings.ELEVENLABS_API_KEY}, timeout=20.0)
+        except Exception as e:
+            print(f"[voice clone] ElevenLabs delete failed for {vid}: {e}")
+    try:
+        folder = f"voice-samples/{clone['user_id']}"
+        names = [f["name"] for f in (supabase.storage.from_("story-audio").list(folder) or []) if f.get("name", "").startswith(clone["id"])]
+        if names:
+            supabase.storage.from_("story-audio").remove([f"{folder}/{n}" for n in names])
+    except Exception as e:
+        print(f"[voice clone] sample cleanup failed: {e}")
+    supabase.table("voice_clones").delete().eq("id", clone["id"]).execute()
+
+
+def purge_expired_voice_clones() -> int:
+    """Deletes every clone whose 10-day window is over. Returns how many were removed."""
+    from datetime import datetime, timezone
+    supabase = get_supabase()
+    now = datetime.now(timezone.utc).isoformat()
+    rows = supabase.table("voice_clones").select("*").lt("expires_at", now).execute().data or []
+    for c in rows:
+        try:
+            delete_clone_everywhere(supabase, c)
+        except Exception as e:
+            print(f"[voice clone] purge failed for {c.get('id')}: {e}")
+    return len(rows)

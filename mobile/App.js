@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
-import { SafeAreaView, StyleSheet, View, Text, TouchableOpacity, Platform, Alert, LogBox, StatusBar as RNStatusBar, Modal } from "react-native";
+import { SafeAreaView, StyleSheet, View, Text, TextInput, TouchableOpacity, Platform, Alert, LogBox, StatusBar as RNStatusBar, Modal, Linking } from "react-native";
 import { initialWindowMetrics } from "react-native-safe-area-context";
 import SafeAudio from "./src/utils/safeAudio";
 import { colors } from "./src/theme/colors";
 import { authStorage } from "./src/api/authStorage";
 import { api, setOnUnauthorizedHandler } from "./src/api/client";
+import { SITE_URL } from "./src/api/config";
 
 LogBox.ignoreAllLogs(true);
 
@@ -57,6 +58,13 @@ export default function App() {
   const [pendingParentTarget, setPendingParentTarget] = useState("profiles"); // 'profiles' | 'login'
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false); // Delete-account confirmation
+  const [deletePw, setDeletePw] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteErr, setDeleteErr] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false); // header ☰ menu
+  const [notifSignal, setNotifSignal] = useState(0); // bumps to open the notification sheet
+  const [unreadCount, setUnreadCount] = useState(0);
   const [browseLanguage, setBrowseLanguage] = useState("en"); // story-list language filter (Home + categories)
   const [categoryBackStep, setCategoryBackStep] = useState("home"); // where Back goes from a category page
 
@@ -168,6 +176,28 @@ export default function App() {
     }
   }
 
+  function openSitePage(page) {
+    setMenuOpen(false);
+    const url = `${SITE_URL}/${page}`;
+    if (Platform.OS === "web" && typeof window !== "undefined") window.open(url, "_blank");
+    else Linking.openURL(url).catch(() => {});
+  }
+
+  async function handleDeleteAccount() {
+    setDeleteBusy(true);
+    setDeleteErr("");
+    try {
+      await api.deleteAccount(deletePw);
+      setDeleteOpen(false);
+      setDeletePw("");
+      await handleLogout();
+    } catch (e) {
+      setDeleteErr(e?.message || "Could not delete the account. Please try again.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   async function handleLogout() {
     // 1. Immediately silence all active audio playback (narration and ambient)
     try {
@@ -216,6 +246,9 @@ export default function App() {
 
           <View style={styles.headerRightRow}>
             <NotificationBell
+              hideButton
+              openSignal={notifSignal}
+              onUnreadChange={setUnreadCount}
               userKey={currentUser?.id || "guest"}
               onAction={(action) => {
                 // Buttons on announcements only ever open screens inside the app.
@@ -224,38 +257,115 @@ export default function App() {
                 else if (["home", "create", "history"].includes(action)) setCurrentStep(action);
               }}
             />
-            {currentUser ? (
-              <>
-                <TouchableOpacity
-                  style={styles.parentPill}
-                  onPress={handleOpenParentArea}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.parentPillText}>
-                    {activeProfile ? `🧸 ${activeProfile.name}` : "🛡️ Family Profiles"}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.logoutBtn}
-                  onPress={handleLogout}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.logoutBtnText}>🚪 Log Out</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <TouchableOpacity
-                style={styles.loginPill}
-                onPress={handleDirectLoginPress}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.loginPillText}>🔑 Parent Login</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.8}>
+              <Text style={styles.menuBtnIcon}>☰</Text>
+              {unreadCount > 0 && <View style={styles.menuDot} />}
+            </TouchableOpacity>
           </View>
         </View>
       )}
+
+      {/* Delete account: asks for the password, then removes everything */}
+      <Modal visible={deleteOpen} transparent animationType="fade" onRequestClose={() => setDeleteOpen(false)}>
+        <View style={styles.delScrim}>
+          <View style={styles.delCard}>
+            <Text style={styles.delTitle}>Delete your account?</Text>
+            <Text style={styles.delText}>
+              This permanently deletes your account, child profiles, history, stories you made and your cloned voices. It cannot be undone. Any auto-renew is stopped. Payment records are kept only as the law requires.
+            </Text>
+            <TextInput
+              style={styles.delInput}
+              placeholder="Enter your password to confirm"
+              placeholderTextColor="#6b6e80"
+              secureTextEntry
+              value={deletePw}
+              onChangeText={setDeletePw}
+              autoCapitalize="none"
+            />
+            {deleteErr ? <Text style={styles.delErr}>{deleteErr}</Text> : null}
+            <View style={styles.delRow}>
+              <TouchableOpacity style={styles.delBtnGhost} onPress={() => setDeleteOpen(false)} disabled={deleteBusy}>
+                <Text style={styles.delBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.delBtnDanger, (!deletePw || deleteBusy) && { opacity: 0.5 }]}
+                disabled={!deletePw || deleteBusy}
+                onPress={handleDeleteAccount}
+              >
+                <Text style={styles.delBtnText}>{deleteBusy ? "Deleting..." : "Delete forever"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Header menu: notifications and profile */}
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <TouchableOpacity style={styles.menuScrim} activeOpacity={1} onPress={() => setMenuOpen(false)}>
+          <View style={styles.menuPanel} onStartShouldSetResponder={() => true}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuOpen(false);
+                setTimeout(() => setNotifSignal((n) => n + 1), 250);
+              }}
+            >
+              <Text style={styles.menuItemText}>🔔 Notifications</Text>
+              {unreadCount > 0 && (
+                <View style={styles.menuCount}>
+                  <Text style={styles.menuCountText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {currentUser ? (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuOpen(false);
+                  setTimeout(handleOpenParentArea, 250);
+                }}
+              >
+                <Text style={styles.menuItemText} numberOfLines={1}>
+                  {activeProfile ? `🧸 ${activeProfile.name}` : "🛡️ Family Profiles"}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuOpen(false);
+                  setTimeout(handleDirectLoginPress, 250);
+                }}
+              >
+                <Text style={styles.menuItemText}>🔑 Parent Login</Text>
+              </TouchableOpacity>
+            )}
+            {SITE_URL ? (
+              <>
+                <TouchableOpacity style={styles.menuItem} onPress={() => openSitePage("privacy.html")}>
+                  <Text style={styles.menuItemText}>🔒 Privacy Policy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={() => openSitePage("terms.html")}>
+                  <Text style={styles.menuItemText}>📄 Terms & Refunds</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+            {currentUser ? (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuOpen(false);
+                  setDeletePw("");
+                  setDeleteErr("");
+                  setTimeout(() => setDeleteOpen(true), 250);
+                }}
+              >
+                <Text style={[styles.menuItemText, { color: "#ff6b6b" }]}>🗑️ Delete my account</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Listening Screens */}
       {currentStep === "age" && (
@@ -470,6 +580,10 @@ export default function App() {
             <Text style={styles.navIcon}>🕘</Text>
             <Text style={[styles.navText, currentStep === "history" && styles.navTextActive]}>History</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.navItem} onPress={currentUser ? handleLogout : handleDirectLoginPress}>
+            <Text style={styles.navIcon}>{currentUser ? "🚪" : "🔑"}</Text>
+            <Text style={styles.navText}>{currentUser ? "Log Out" : "Log In"}</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -526,6 +640,59 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  delScrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", padding: 20 },
+  delCard: { backgroundColor: "#0d0e16", borderRadius: 20, padding: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
+  delTitle: { color: "#fff", fontSize: 20, fontWeight: "800", marginBottom: 8 },
+  delText: { color: "#b9bccb", fontSize: 13, lineHeight: 19, marginBottom: 14 },
+  delInput: { backgroundColor: "#14151d", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", color: "#fff", paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 },
+  delErr: { color: "#ff6b6b", fontSize: 12, marginTop: 8 },
+  delRow: { flexDirection: "row", gap: 10, marginTop: 16 },
+  delBtnGhost: { flex: 1, backgroundColor: "#232430", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+  delBtnDanger: { flex: 1, backgroundColor: "#7f1d1d", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+  delBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  menuBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#14151d",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuBtnIcon: { color: "#ffffff", fontSize: 19 },
+  menuDot: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: "#e50914",
+  },
+  menuScrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "flex-end" },
+  menuPanel: {
+    width: 230,
+    height: "100%",
+    backgroundColor: "#0d0e16",
+    borderLeftWidth: 1,
+    borderLeftColor: "rgba(255,255,255,0.12)",
+    paddingTop: Platform.OS === "android" ? 64 : 60,
+    paddingHorizontal: 12,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 13,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#14151d",
+    marginBottom: 8,
+  },
+  menuItemText: { color: "#ffffff", fontSize: 14, fontWeight: "600", flexShrink: 1 },
+  menuCount: { backgroundColor: "#e50914", borderRadius: 10, paddingHorizontal: 7, paddingVertical: 1 },
+  menuCountText: { color: "#fff", fontSize: 11, fontWeight: "800" },
   parentPill: {
     backgroundColor: "rgba(147, 51, 234, 0.15)",
     paddingVertical: 6,

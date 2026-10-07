@@ -15,3 +15,10 @@ const getBaseUrl = () => {
 };
 
 export const API_BASE_URL = getBaseUrl();
+
+// Public website (privacy policy, terms, delete-account pages). On the web build it is
+// the site itself; in the phone app set EXPO_PUBLIC_SITE_URL to the live site address.
+export const SITE_URL = (
+  process.env.EXPO_PUBLIC_SITE_URL ||
+  (Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : "")
+).replace(/\/$/, "");

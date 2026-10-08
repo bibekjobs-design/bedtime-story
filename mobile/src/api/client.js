@@ -99,6 +99,10 @@ export const api = {
   getAccents: () => request("/api/lookups/accents"),
 
   // Tab 1: Listen to Story (Pre-created from DB)
+  getHomeFeed: (ageGroupId, sortBy = "popular", languageCode = null, fresh = false) =>
+    request(
+      `/api/stories/feed?age_group_id=${ageGroupId}&sort_by=${sortBy}${languageCode ? `&language_code=${languageCode}` : ""}${fresh ? "&fresh=true" : ""}`
+    ),
   getPrecreatedStories: (categoryId, ageGroupId, languageId = 1, sortBy = "popular", languageCode = null) =>
     request(
       `/api/stories/precreated?age_group_id=${ageGroupId}&language_id=${languageId}${

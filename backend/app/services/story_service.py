@@ -800,6 +800,78 @@ def get_precreated_stories(
     return apply_language_view(get_supabase(), stories, language_code)
 
 
+_FEED_CACHE: Dict[Any, Any] = {}
+_FEED_TTL_SECONDS = 20
+
+
+def clear_feed_cache() -> None:
+    """Call after any change to the public library (publish/edit/delete/rate)."""
+    _FEED_CACHE.clear()
+
+
+def get_home_feed(age_group_id: int = 1, sort_by: str = "popular", language_code: Optional[str] = None) -> Dict[str, Any]:
+    """
+    The whole Home screen in ONE call: every active category with its stories
+    (plus an "Others" row), already de-duplicated. Replaces ~10 separate
+    requests, never auto-generates stories, and is cached for a few seconds.
+    """
+    key = (age_group_id, sort_by, (language_code or "").lower())
+    hit = _FEED_CACHE.get(key)
+    if hit and time.time() - hit[0] < _FEED_TTL_SECONDS:
+        return hit[1]
+
+    supabase = get_supabase()
+    cats = supabase.table("story_categories").select("*").eq("is_active", True).execute().data or []
+
+    query = (
+        supabase.table("story_texts")
+        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings")
+        .eq("age_group_id", age_group_id)
+        .is_("owner_user_id", "null")
+    )
+    if sort_by == "newest":
+        query = query.order("created_at", desc=True)
+    else:
+        query = query.order("times_served", desc=True).order("created_at", desc=True)
+    raw = query.limit(500).execute().data or []
+
+    stories = enrich_audio_story_items(supabase, raw)
+    stories = apply_language_view(supabase, stories, language_code)
+
+    known = {c["id"] for c in cats}
+    by_cat: Dict[Any, list] = {}
+    others = []
+    for s in stories:
+        cid = s.get("category_id")
+        if cid in known:
+            by_cat.setdefault(cid, []).append(s)
+        else:
+            others.append(s)
+
+    rows = [{"category": c, "stories": by_cat.get(c["id"], [])} for c in cats]
+    if others:
+        rows.append({"category": {"id": "others", "name": "Others", "icon_url": "📦"}, "stories": others})
+
+    seen_ids, seen_titles = set(), set()
+    out_rows = []
+    for r in rows:
+        kept = []
+        for st in r["stories"][:50]:
+            title_key = " ".join(str(st.get("title") or "").lower().split())
+            if st["id"] in seen_ids or (title_key and title_key in seen_titles):
+                continue
+            seen_ids.add(st["id"])
+            if title_key:
+                seen_titles.add(title_key)
+            kept.append(st)
+        if kept:
+            out_rows.append({"category": r["category"], "stories": kept})
+
+    result = {"categories": cats, "rows": out_rows}
+    _FEED_CACHE[key] = (time.time(), result)
+    return result
+
+
 def search_stories(
     query: str,
     age_group_id: int,

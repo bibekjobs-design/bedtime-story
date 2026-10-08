@@ -335,25 +335,27 @@ export default function HomeFeedScreen({
       setLoading(true);
     }
     try {
-      const cats = (await api.getCategories()) || [];
-      // Category lists and the "Others" list load together (one round trip, not two)
-      const [catLists, others] = await Promise.all([
-        Promise.all(
-          cats.map((c) =>
-            api
-              .getPrecreatedStories(c.id, ageId, 1, activeFilter, browseLanguage)
-              .then((d) => d || [])
-              .catch(() => [])
-          )
-        ),
-        api
-          .getPrecreatedStories("others", ageId, 1, activeFilter, browseLanguage)
-          .then((d) => d || [])
-          .catch(() => []),
-      ]);
-      const rows = cats.map((c, i) => ({ category: c, stories: catLists[i] }));
-      if (others.length > 0) {
-        rows.push({ category: { id: "others", name: "Others", icon_url: "📦" }, stories: others });
+      let cats = [];
+      let rows = [];
+      try {
+        // One request for the whole screen (fast path)
+        const feed = await api.getHomeFeed(ageId, activeFilter, browseLanguage, force);
+        cats = feed.categories || [];
+        rows = (feed.rows || []).map((r) => ({ category: r.category, stories: r.stories || [] }));
+      } catch (feedErr) {
+        // Older backend without /feed: fall back to the per-category requests.
+        cats = (await api.getCategories()) || [];
+        let failed = false;
+        const safe = (p) => p.then((d) => d || []).catch(() => { failed = true; return []; });
+        const [catLists, others] = await Promise.all([
+          Promise.all(cats.map((c) => safe(api.getPrecreatedStories(c.id, ageId, 1, activeFilter, browseLanguage)))),
+          safe(api.getPrecreatedStories("others", ageId, 1, activeFilter, browseLanguage)),
+        ]);
+        if (failed && cached) throw feedErr; // keep the good list we already show
+        rows = cats.map((c, i) => ({ category: c, stories: catLists[i] }));
+        if (others.length > 0) {
+          rows.push({ category: { id: "others", name: "Others", icon_url: "📦" }, stories: others });
+        }
       }
       // A story is shown only once on screen: drop repeats across rows
       // (same id, or the same title published twice, counts as a repeat)

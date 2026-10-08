@@ -7,6 +7,8 @@ from app.db import get_supabase
 from app.auth import get_current_user, get_current_user_optional
 from app.services.story_service import (
     get_precreated_stories,
+    get_home_feed,
+    clear_feed_cache,
     generate_custom_story,
     generate_multimodal_story,
     commit_and_narrate_story,
@@ -93,6 +95,25 @@ class BrowseStoriesRequest(BaseModel):
     age_group_id: int = Field(default=1, description="ID of selected age group")
     language_id: int = Field(default=1, description="ID of language")
     target_count: Optional[int] = Field(default=20)
+
+
+@router.get("/feed")
+def get_home_feed_endpoint(
+    age_group_id: int = Query(1),
+    sort_by: str = Query("popular"),
+    language_code: Optional[str] = Query(None),
+    fresh: bool = Query(False, description="Skip the short server cache"),
+):
+    """Home screen in one request: categories + their stories, de-duplicated."""
+    try:
+        if fresh:
+            clear_feed_cache()
+        return JSONResponse(content=get_home_feed(age_group_id, sort_by, language_code))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load home feed: {str(exc)}"
+        )
 
 
 @router.get("/precreated")
@@ -501,6 +522,7 @@ async def publish_manual_story_endpoint(
         cover_mime = cover_image.content_type
 
     try:
+        clear_feed_cache()
         return publish_manual_story(
             title=title,
             full_text=full_text,
@@ -577,6 +599,7 @@ async def edit_story_endpoint(
         if language_code and language_code.strip():
             from app.services.story_service import update_story_translation
             return update_story_translation(story_text_id, language_code, title=title, full_text=full_text)
+        clear_feed_cache()
         return update_manual_story(
             story_text_id=story_text_id,
             title=title,
@@ -610,6 +633,7 @@ def delete_story_endpoint(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only.")
     try:
         delete_story_completely(story_text_id)
+        clear_feed_cache()
         return {"deleted": True, "story_text_id": story_text_id}
     except ValueError as val_err:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(val_err))
@@ -686,6 +710,7 @@ def rate_story_endpoint(
             user_id=None,
             device_id=payload.device_id
         )
+        clear_feed_cache()
         return result
     except ValueError as e:
         raise HTTPException(

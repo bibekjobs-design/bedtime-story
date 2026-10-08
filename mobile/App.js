@@ -11,7 +11,7 @@ import { SITE_URL } from "./src/api/config";
 LogBox.ignoreAllLogs(true);
 
 import AgeGroupScreen from "./src/screens/AgeGroupScreen";
-import HomeFeedScreen from "./src/screens/HomeFeedScreen";
+import HomeFeedScreen, { clearFeedCache } from "./src/screens/HomeFeedScreen";
 import CreateScreen from "./src/screens/CreateScreen";
 import PlayerScreen from "./src/screens/PlayerScreen";
 import LoginScreen from "./src/screens/LoginScreen";
@@ -19,7 +19,7 @@ import RegisterScreen from "./src/screens/RegisterScreen";
 import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
 import ResetPasswordScreen from "./src/screens/ResetPasswordScreen";
 import ProfilesScreen from "./src/screens/ProfilesScreen";
-import HistoryScreen from "./src/screens/HistoryScreen";
+import HistoryScreen, { clearHistoryCache } from "./src/screens/HistoryScreen";
 import CategoryStoriesScreen from "./src/screens/CategoryStoriesScreen";
 import AdminDashboardScreen from "./src/screens/AdminDashboardScreen";
 import ParentalGateModal from "./src/components/ParentalGateModal";
@@ -199,6 +199,8 @@ export default function App() {
   }
 
   async function handleLogout() {
+    clearFeedCache();
+    clearHistoryCache();
     // 1. Immediately silence all active audio playback (narration and ambient)
     try {
       await SafeAudio.stopAllAudio();

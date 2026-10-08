@@ -314,8 +314,7 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
                 {consentGiven && <Text style={styles.checkmark}>✓</Text>}
               </View>
               <Text style={styles.checkboxLabel}>
-                I am the parent/guardian and this is my own voice (or the person has agreed). I consent to STORYLAND sending this recording to our voice partner (ElevenLabs) to make a voice for bedtime stories only. The voice and recording are deleted automatically 10 days after they are created, and I can delete them at any time. I can download my voice sample before then.
-              </Text>
+                I am the parent/guardian and this is my own voice (or the person has agreed). I consent to STORYLAND sending this recording to our voice partner (ElevenLabs) to make a voice for bedtime stories only. My cloned voice stays until I delete it. Stories made in my voice are deleted automatically 10 days after they are created, and I can save them before then.</Text>
             </TouchableOpacity>
           )}
 

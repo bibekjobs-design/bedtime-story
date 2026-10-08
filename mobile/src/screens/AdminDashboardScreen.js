@@ -79,7 +79,6 @@ export default function AdminDashboardScreen({ onGoToHome }) {
   useEffect(() => {
     load();
     loadMonthlyReport();
-    loadCategories();
   }, []);
 
   async function loadCategories() {
@@ -169,47 +168,6 @@ export default function AdminDashboardScreen({ onGoToHome }) {
             <TouchableOpacity style={styles.refreshBtn} onPress={load}>
               <Text style={styles.refreshBtnText}>🔄 Refresh</Text>
             </TouchableOpacity>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🖼️ Category Cover Images</Text>
-              <Text style={styles.forecastNote}>
-                One-time AI-generated picture per category. Generate once here and every parent/child
-                sees the same stored image from then on - regenerating replaces it for everyone.
-              </Text>
-              {categoriesLoading ? (
-                <ActivityIndicator size="small" color="#f5a623" style={{ marginVertical: 16 }} />
-              ) : (
-                <View style={styles.categoryImgGrid}>
-                  {categories.map((cat) => (
-                    <View key={cat.id} style={styles.categoryImgCard}>
-                      <View style={styles.categoryImgWrap}>
-                        {cat.image_url ? (
-                          <Image source={{ uri: cat.image_url }} style={styles.categoryImgThumb} />
-                        ) : (
-                          <Text style={styles.categoryImgPlaceholder}>{cat.icon_url || "📖"}</Text>
-                        )}
-                      </View>
-                      <Text style={styles.categoryImgName} numberOfLines={1}>
-                        {cat.name}
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.categoryImgBtn}
-                        disabled={generatingCategoryId === cat.id}
-                        onPress={() => handleGenerateCategoryImage(cat)}
-                      >
-                        {generatingCategoryId === cat.id ? (
-                          <ActivityIndicator size="small" color="#f5a623" />
-                        ) : (
-                          <Text style={styles.categoryImgBtnText}>
-                            {cat.image_url ? "Regenerate" : "Generate"}
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
 
             {data.capacity_forecast && (
               <View style={styles.section}>

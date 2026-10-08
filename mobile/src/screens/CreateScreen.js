@@ -404,17 +404,25 @@ export default function CreateScreen({
                   Read the whole PDF, or pick just one chapter (e.g. pages 3–7).
                 </Text>
               </View>
-            ) : (
-              <Text style={styles.hintText}>
-                For PDFs you can also read just a page range (e.g. pages 3–7) — pick a PDF to see it.
+            ) : null}
+
+            <View style={styles.limitBox}>
+              <Text style={styles.limitBoxTitle}>📖 Reading a PDF?</Text>
+              <Text style={styles.limitBoxText}>
+                You can read the whole PDF or just one chapter. After you pick a PDF, choose "Page Range" and enter the From and To page (for example pages 3 to 7). The story length limit below still applies to the pages you choose.
               </Text>
-            )}
+            </View>
 
             <View style={styles.limitBox}>
               <Text style={styles.limitBoxTitle}>⏱ Story length limit</Text>
               <Text style={styles.limitBoxText}>
                 {voiceSource === "clone" ? cloneLengthText : narratorLengthText}
               </Text>
+              {voiceSource === "clone" ? (
+                <Text style={[styles.limitBoxText, { marginTop: 8, color: "#ffd479" }]}>
+                  ⏳ Stories made in your voice are deleted automatically 10 days after they are created. Open History and tap ⬇️ on the story to save it to your device before then.
+                </Text>
+              ) : null}
             </View>
           </View>
 

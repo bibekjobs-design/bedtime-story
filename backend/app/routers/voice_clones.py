@@ -8,7 +8,7 @@ from app.services.voice_clone_service import (
     register_parent_voice_clone,
     narrate_story_with_voice_clone,
     delete_clone_everywhere,
-    purge_expired_voice_clones,
+    purge_expired_cloned_stories,
 )
 
 router = APIRouter(prefix="/api/voice-clones", tags=["Voice Clones"])
@@ -24,9 +24,9 @@ class NarrateClonedRequest(BaseModel):
 def list_voice_clones(current_user: dict = Depends(get_current_user)):
     """Lists all voice clones registered by the authenticated parent."""
     try:
-        purge_expired_voice_clones()
+        purge_expired_cloned_stories()
     except Exception as e:
-        print(f"[voice clones] purge on list failed: {e}")
+        print(f"[cloned stories] purge on list failed: {e}")
     supabase = get_supabase()
     res = (
         supabase.table("voice_clones")

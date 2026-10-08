@@ -294,6 +294,7 @@ export const api = {
 
   // History (server-side, per-account - survives cache clears/device changes)
   getHistory: (limit = 60) => request(`/api/history/?limit=${limit}`),
+  deleteHistoryItem: (id) => request(`/api/history/${id}`, { method: "DELETE" }),
   getMyCreations: (limit = 60) => request(`/api/history/my-creations?limit=${limit}`),
 
   // Personalized Story Commit (weaves child's name into tale)

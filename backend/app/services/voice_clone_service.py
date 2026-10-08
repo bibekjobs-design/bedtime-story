@@ -10,8 +10,9 @@ from app.services.usage_service import check_and_increment_usage
 
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1"
 
-# Privacy: a parent voice clone (and its recording) is deleted this many days after it is created.
-VOICE_CLONE_RETENTION_DAYS = 10
+# Privacy: a story narrated in a parent's cloned voice is deleted this many days after it is made.
+# The cloned voice itself stays until the parent deletes it. Admin stories never expire.
+CLONED_STORY_RETENTION_DAYS = 10
 
 # --- ElevenLabs narration model: ALWAYS the cheapest one ---------------------
 # Single source of truth for EVERY ElevenLabs text-to-speech call in the app
@@ -43,6 +44,14 @@ VOICE_CLONE_TEST_CHAR_LIMIT = CLONED_VOICE_CHAR_LIMIT
 # ~1,215 chars is ~1.5 minutes at the app's ~135 wpm / ~6 chars-per-word pace.
 # Only applied when the caller explicitly passes admin_test=True.
 ADMIN_TEST_VOICE_CLONE_CHAR_LIMIT = 1215
+
+def _story_expiry_iso(supabase, user_id: str):
+    """When a cloned-voice story should be auto-deleted (None for the admin account)."""
+    from datetime import datetime, timezone, timedelta
+    if _is_admin_user(supabase, user_id):
+        return None
+    return (datetime.now(timezone.utc) + timedelta(days=CLONED_STORY_RETENTION_DAYS)).isoformat()
+
 
 async def register_parent_voice_clone(
     user_id: str,
@@ -109,7 +118,6 @@ async def register_parent_voice_clone(
         "provider": "elevenlabs",
         "provider_voice_id": provider_voice_id,
         "consent_given_at": datetime.now(timezone.utc).isoformat(),
-        "expires_at": (datetime.now(timezone.utc) + __import__("datetime").timedelta(days=VOICE_CLONE_RETENTION_DAYS)).isoformat(),
         "status": status,
     }
     insert_res = supabase.table("voice_clones").insert(record).execute()
@@ -183,6 +191,7 @@ async def narrate_story_with_voice_clone(
             voice_clone_id=voice_clone_id,
             audio_url=c["audio_url"],
             duration_seconds=c["duration_seconds"],
+            expires_at=c.get("expires_at"),
         )
         return {
             "id": c["id"],
@@ -192,6 +201,7 @@ async def narrate_story_with_voice_clone(
             "duration_seconds": c["duration_seconds"],
             "voice_tier": "cloned",
             "ambient_sound": ambient_sound,
+            "expires_at": c.get("expires_at"),
             "cached": True,
         }
 
@@ -343,7 +353,14 @@ async def narrate_story_with_voice_clone(
         "duration_seconds": duration_seconds,
         "safety_check_status": "passed",
     }
-    insert_res = supabase.table("personalized_stories").insert(insert_payload).execute()
+    expires_at = _story_expiry_iso(supabase, user_id)
+    try:
+        insert_res = supabase.table("personalized_stories").insert({**insert_payload, "expires_at": expires_at}).execute()
+    except Exception as e:
+        # expires_at column not added yet (SQL 008 not run): still save the story.
+        print(f"[cloned story] saving without expiry ({e})")
+        expires_at = None
+        insert_res = supabase.table("personalized_stories").insert(insert_payload).execute()
     new_record = insert_res.data[0] if insert_res.data else insert_payload
 
     from app.services.history_service import record_story_event
@@ -356,6 +373,7 @@ async def narrate_story_with_voice_clone(
         voice_clone_id=voice_clone_id,
         audio_url=audio_url,
         duration_seconds=duration_seconds,
+        expires_at=expires_at,
     )
 
     return {
@@ -366,9 +384,26 @@ async def narrate_story_with_voice_clone(
         "duration_seconds": duration_seconds,
         "voice_tier": "cloned",
         "ambient_sound": ambient_sound,
+        "expires_at": expires_at,
         "cached": False,
     }
 
+
+
+def _is_admin_user(supabase, user_id: str) -> bool:
+    """True for the admin/owner account(s): their cloned voices are never auto-deleted."""
+    try:
+        from app.auth import ADMIN_EMAILS
+        r = supabase.table("users").select("email, subscription_tier").eq("id", user_id).limit(1).execute()
+        if not r.data:
+            return False
+        u = r.data[0]
+        return (u.get("email") or "").lower().strip() in {e.lower() for e in ADMIN_EMAILS} or \
+            (u.get("subscription_tier") or "") in ("admin", "admin_vip", "superadmin")
+    except Exception as e:
+        # If we cannot tell, do NOT delete: keeping a voice is the safe side.
+        print(f"[voice clone] admin check failed, keeping voice: {e}")
+        return True
 
 
 def delete_clone_everywhere(supabase, clone: dict) -> None:
@@ -390,15 +425,40 @@ def delete_clone_everywhere(supabase, clone: dict) -> None:
     supabase.table("voice_clones").delete().eq("id", clone["id"]).execute()
 
 
-def purge_expired_voice_clones() -> int:
-    """Deletes every clone whose 10-day window is over. Returns how many were removed."""
+def purge_expired_cloned_stories() -> int:
+    """
+    Deletes every cloned-voice story whose 10-day window is over: the audio file,
+    the saved story row and its History entry. Cloned voices themselves are never
+    touched here, and admin stories are skipped. Returns how many were removed.
+    """
     from datetime import datetime, timezone
     supabase = get_supabase()
     now = datetime.now(timezone.utc).isoformat()
-    rows = supabase.table("voice_clones").select("*").lt("expires_at", now).execute().data or []
-    for c in rows:
+    rows = supabase.table("personalized_stories").select("*").lt("expires_at", now).execute().data or []
+    removed = 0
+    for r in rows:
         try:
-            delete_clone_everywhere(supabase, c)
+            owner = None
+            if r.get("voice_clone_id"):
+                c = supabase.table("voice_clones").select("user_id").eq("id", r["voice_clone_id"]).limit(1).execute().data
+                owner = c[0]["user_id"] if c else None
+            if owner and _is_admin_user(supabase, owner):
+                supabase.table("personalized_stories").update({"expires_at": None}).eq("id", r["id"]).execute()
+                continue
+            url = r.get("audio_url") or ""
+            if "/story-audio/" in url:
+                path = url.split("/story-audio/", 1)[1].split("?", 1)[0]
+                try:
+                    supabase.storage.from_("story-audio").remove([path])
+                except Exception as e:
+                    print(f"[cloned story] audio cleanup failed: {e}")
+            if url:
+                try:
+                    supabase.table("story_events").delete().eq("audio_url", url).execute()
+                except Exception:
+                    pass
+            supabase.table("personalized_stories").delete().eq("id", r["id"]).execute()
+            removed += 1
         except Exception as e:
-            print(f"[voice clone] purge failed for {c.get('id')}: {e}")
-    return len(rows)
+            print(f"[cloned story] purge failed for {r.get('id')}: {e}")
+    return removed

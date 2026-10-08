@@ -145,8 +145,6 @@ INDIAN_LANGS = {
     "bn": {"locale": "bn-IN", "fallback_f": "bn-IN-Wavenet-A", "fallback_m": "bn-IN-Wavenet-B"},
     "kn": {"locale": "kn-IN", "fallback_f": "kn-IN-Wavenet-A", "fallback_m": "kn-IN-Wavenet-B"},
     "te": {"locale": "te-IN", "fallback_f": "te-IN-Standard-A", "fallback_m": "te-IN-Standard-B"},
-    # Odia: only Gemini-TTS has it (or-IN, GA). Tries flash first, then pro.
-    "or": {"locale": "or-IN", "gemini": True},
 }
 GEMINI_TTS_MODEL = "gemini-2.5-flash-tts"
 GEMINI_VOICE_FOR_PERSONA = {"luna": "Aoede", "oliver": "Charon", "willow": "Kore", "jasper": "Puck"}

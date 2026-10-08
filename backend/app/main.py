@@ -51,17 +51,17 @@ def prewarm_story_cache():
 
 
 @app.on_event("startup")
-def start_voice_clone_cleanup():
-    """Every hour, delete voice clones whose 10-day window is over."""
+def start_cloned_story_cleanup():
+    """Every hour, delete cloned-voice stories whose 10-day window is over."""
     import threading, time
 
     def loop():
         while True:
             try:
-                from app.services.voice_clone_service import purge_expired_voice_clones
-                n = purge_expired_voice_clones()
+                from app.services.voice_clone_service import purge_expired_cloned_stories
+                n = purge_expired_cloned_stories()
                 if n:
-                    print(f"[privacy] removed {n} expired voice clone(s)")
+                    print(f"[privacy] removed {n} expired cloned-voice story(ies)")
             except Exception as e:
                 print(f"[privacy] cleanup note: {e}")
             time.sleep(3600)

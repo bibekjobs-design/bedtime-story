@@ -484,15 +484,6 @@ export default function PlayerScreen({ story, onBack, onSwitchLanguage }) {
           <View style={styles.topActions}>
             <TouchableOpacity
               style={styles.actionBtn}
-              onPress={toggleFavorite}
-            >
-              <Text style={styles.actionIcon}>
-                {isFavorite ? "❤️ Fav" : "🤍 Fav"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionBtn}
               onPress={() => setShowTimerModal(true)}
             >
               <Text style={styles.actionIcon}>
@@ -540,9 +531,6 @@ export default function PlayerScreen({ story, onBack, onSwitchLanguage }) {
               : "Bedtime Story Narration"}
           </Text>
           <Text style={styles.title}>{story.title}</Text>
-          {!isClonedStory && story.teaser ? (
-            <Text style={styles.teaser}>{story.teaser}</Text>
-          ) : null}
           {availableLangs.length > 1 ? (
             <View style={styles.langRow}>
               {availableLangs.map((l) => {
@@ -872,15 +860,17 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: "rgba(245, 166, 35, 0.18)",
+    borderWidth: 1.5,
+    borderColor: "#f5a623",
   },
   backButtonText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: "600",
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "900",
   },
   topActions: {
     flexDirection: "row",

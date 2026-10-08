@@ -7,6 +7,9 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Platform,
+  Linking,
+  Alert,
 } from "react-native";
 import { api } from "../api/client";
 
@@ -116,6 +119,28 @@ function timeAgo(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
+// Cloned-voice stories are removed 10 days after they are made.
+function daysLeft(expiresAt) {
+  if (!expiresAt) return null;
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (Number.isNaN(ms)) return null;
+  return Math.max(0, Math.ceil(ms / 86400000));
+}
+
+function expiryLabel(expiresAt) {
+  const d = daysLeft(expiresAt);
+  if (d === null) return null;
+  if (d <= 0) return "Deleting soon";
+  if (d === 1) return "Deletes tomorrow";
+  return `Deletes in ${d} days`;
+}
+
+function saveAudio(url) {
+  if (!url) return;
+  if (Platform.OS === "web" && typeof window !== "undefined") window.open(url, "_blank");
+  else Linking.openURL(url).catch(() => {});
+}
+
 function groupByOrigin(events) {
   const groups = { library: [], cloned: [], ai: [] };
   const seen = new Set();
@@ -133,7 +158,7 @@ function groupByOrigin(events) {
   return groups;
 }
 
-function HistoryCard({ title, cover, emoji, line, tag, onPress }) {
+function HistoryCard({ title, cover, emoji, line, tag, onPress, expiry, onSave, onDelete }) {
   const [broken, setBroken] = useState(false);
   const hasCover = !broken && typeof cover === "string" && cover.startsWith("http");
   return (
@@ -153,7 +178,7 @@ function HistoryCard({ title, cover, emoji, line, tag, onPress }) {
       )}
       <View style={styles.titleShade1} pointerEvents="none" />
       <View style={styles.titleShade2} pointerEvents="none" />
-      <View style={styles.cardTextWrap} pointerEvents="none">
+      <View style={[styles.cardTextWrap, onDelete ? { paddingRight: 30 } : null]} pointerEvents="none">
         <Text style={styles.cardTitle} numberOfLines={2}>
           {title}
         </Text>
@@ -164,14 +189,36 @@ function HistoryCard({ title, cover, emoji, line, tag, onPress }) {
           <Text style={styles.tagBadgeText}>{tag}</Text>
         </View>
       ) : null}
+      {onSave ? (
+        <TouchableOpacity style={styles.saveBtn} onPress={onSave} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <Text style={styles.saveBtnText}>⬇️</Text>
+        </TouchableOpacity>
+      ) : null}
+      {onDelete ? (
+        <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <Text style={styles.saveBtnText}>🗑️</Text>
+        </TouchableOpacity>
+      ) : null}
+      {expiry ? (
+        <View style={[styles.expiryBadge, expiry.urgent && styles.expiryBadgeUrgent]}>
+          <Text style={styles.expiryBadgeText}>{expiry.text}</Text>
+        </View>
+      ) : null}
     </TouchableOpacity>
   );
 }
 
+// Kept in memory so History shows instantly when the tab is clicked again,
+// then refreshes quietly in the background.
+let HISTORY_CACHE = null;
+export function clearHistoryCache() {
+  HISTORY_CACHE = null;
+}
+
 export default function HistoryScreen({ step, onPlayStory, onGoToHome }) {
-  const [history, setHistory] = useState([]);
-  const [creations, setCreations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [history, setHistory] = useState(HISTORY_CACHE ? HISTORY_CACHE.history : []);
+  const [creations, setCreations] = useState(HISTORY_CACHE ? HISTORY_CACHE.creations : []);
+  const [loading, setLoading] = useState(!HISTORY_CACHE);
 
   useEffect(() => {
     loadHistory();
@@ -183,19 +230,52 @@ export default function HistoryScreen({ step, onPlayStory, onGoToHome }) {
 
   async function loadHistory() {
     try {
-      setLoading(true);
+      if (!HISTORY_CACHE) setLoading(true);
       const [historyRes, creationsRes] = await Promise.all([
         api.getHistory(60).catch(() => []),
         api.getMyCreations(60).catch(() => []),
       ]);
-      setHistory(Array.isArray(historyRes) ? historyRes : []);
-      setCreations(Array.isArray(creationsRes) ? creationsRes : []);
+      const h = Array.isArray(historyRes) ? historyRes : [];
+      const c = Array.isArray(creationsRes) ? creationsRes : [];
+      HISTORY_CACHE = { history: h, creations: c };
+      setHistory(h);
+      setCreations(c);
     } catch (e) {
       console.warn("Failed to load history", e);
-      setHistory([]);
-      setCreations([]);
+      if (!HISTORY_CACHE) {
+        setHistory([]);
+        setCreations([]);
+      }
     } finally {
       setLoading(false);
+    }
+  }
+
+  function confirmDelete(item) {
+    const msg = `Remove "${item.title || "this story"}" from History?`;
+    const run = async () => {
+      try {
+        await api.deleteHistoryItem(item.id);
+        const same = (e) =>
+          e.origin === item.origin &&
+          (item.story_text_id ? e.story_text_id === item.story_text_id : e.title === item.title) &&
+          (item.origin !== "create_clone" || e.voice_clone_id === item.voice_clone_id);
+        const next = history.filter((e) => !same(e));
+        HISTORY_CACHE = { history: next, creations };
+        setHistory(next);
+      } catch (e) {
+        const m = e?.message || "Couldn't delete. Try again.";
+        if (Platform.OS === "web" && typeof window !== "undefined") window.alert(m);
+        else Alert.alert("Couldn't delete", m);
+      }
+    };
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      if (window.confirm(msg)) run();
+    } else {
+      Alert.alert("Delete", msg, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: run },
+      ]);
     }
   }
 
@@ -238,6 +318,13 @@ export default function HistoryScreen({ step, onPlayStory, onGoToHome }) {
                           cover={item.cover_image_url}
                           emoji={cat.key === "cloned" ? "🎙️" : undefined}
                           tag={cat.key === "cloned" ? "🎙️ Parent" : null}
+                          expiry={
+                            cat.key === "cloned" && expiryLabel(item.expires_at)
+                              ? { text: expiryLabel(item.expires_at), urgent: daysLeft(item.expires_at) <= 2 }
+                              : null
+                          }
+                          onDelete={() => confirmDelete(item)}
+                          onSave={cat.key === "cloned" && item.audio_url ? () => saveAudio(item.audio_url) : null}
                           line={
                             (item.duration_seconds ? Math.round(item.duration_seconds / 60) : 5) +
                             "m · " +
@@ -292,6 +379,41 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   tagBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  saveBtn: {
+    position: "absolute",
+    right: 6,
+    top: 6,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    borderRadius: 12,
+    width: 26,
+    height: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveBtnText: { fontSize: 13 },
+  deleteBtn: {
+    position: "absolute",
+    right: 6,
+    bottom: 6,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    borderRadius: 12,
+    width: 26,
+    height: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  expiryBadge: {
+    position: "absolute",
+    left: 6,
+    right: 6,
+    top: 32,
+    backgroundColor: "rgba(34,120,70,0.9)",
+    borderRadius: 4,
+    paddingVertical: 2,
+    alignItems: "center",
+  },
+  expiryBadgeUrgent: { backgroundColor: "rgba(200,40,40,0.92)" },
+  expiryBadgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
 
   emptyBox: { alignItems: "center", marginTop: 60, paddingHorizontal: 30 },
   emptyEmoji: { fontSize: 48, marginBottom: 10 },

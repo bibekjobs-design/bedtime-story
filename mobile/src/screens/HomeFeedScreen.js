@@ -23,6 +23,17 @@ import LanguagePicker, { LANGUAGES, languageByCode, openStoryInView } from "../c
 // Kept short so search still feels instant.
 const SEARCH_DEBOUNCE_MS = 300;
 
+// Home remounts every time the tab is clicked. Keep the last feed in memory so
+// it shows instantly, then refresh quietly in the background.
+const FEED_CACHE = {};
+const FEED_FRESH_MS = 8000;
+export function clearFeedCache() {
+  Object.keys(FEED_CACHE).forEach((k) => delete FEED_CACHE[k]);
+}
+function feedKey(ageId, filter, lang) {
+  return `${ageId}|${filter}|${lang}`;
+}
+
 function notifyError(message) {
   if (Platform.OS === "web") {
     window.alert(message);
@@ -150,6 +161,11 @@ function StoryCard({ story, width, height, onPress, busy, showNew, isAdmin, onEd
           <Text style={styles.langBadgeText}>{story.language_codes.map((c) => c.toUpperCase()).join(" · ")}</Text>
         </View>
       ) : null}
+      {Number(story.total_ratings) > 0 && Number(story.average_rating) > 0 ? (
+        <View style={[styles.ratingBadge, { top: showNew ? 30 : 7 }]}>
+          <Text style={styles.ratingBadgeText}>⭐ {Number(story.average_rating).toFixed(1)}</Text>
+        </View>
+      ) : null}
       {showNew ? (
         <View style={styles.newBadge}>
           <Text style={styles.newBadgeText}>NEW</Text>
@@ -185,10 +201,11 @@ export default function HomeFeedScreen({
 }) {
   const isAdmin = !!currentUser?.is_admin;
 
-  const [stories, setStories] = useState([]);
-  const [feedRows, setFeedRows] = useState([]); // [{ category, stories }] shown as Netflix-style rows
+  const initialCache = FEED_CACHE[feedKey(activeProfile?.age_group_id || 1, "popular", browseLanguage)];
+  const [stories, setStories] = useState(initialCache ? initialCache.stories : []);
+  const [feedRows, setFeedRows] = useState(initialCache ? initialCache.rows : []); // [{ category, stories }] shown as Netflix-style rows
   const heroRef = useRef(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialCache);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("popular"); // popular, newest, favorites
   const [dbResults, setDbResults] = useState(null); // null = not searched, [] = searched & empty
@@ -304,24 +321,36 @@ export default function HomeFeedScreen({
     }
   }
 
-  async function loadStories() {
-    setLoading(true);
+  async function loadStories(force = false) {
+    const ageId = activeProfile?.age_group_id || 1;
+    const key = feedKey(ageId, activeFilter, browseLanguage);
+    const cached = FEED_CACHE[key];
+    if (cached) {
+      setCategories(cached.cats);
+      setFeedRows(cached.rows);
+      setStories(cached.stories);
+      setLoading(false);
+      if (!force && Date.now() - cached.at < FEED_FRESH_MS) return;
+    } else {
+      setLoading(true);
+    }
     try {
-      const ageId = activeProfile?.age_group_id || 1;
       const cats = (await api.getCategories()) || [];
-      const catLists = await Promise.all(
-        cats.map((c) =>
-          api
-            .getPrecreatedStories(c.id, ageId, 1, activeFilter, browseLanguage)
-            .then((d) => d || [])
-            .catch(() => [])
-        )
-      );
-      // Stories not tagged with a real category show in an "Others" row
-      const others = await api
-        .getPrecreatedStories("others", ageId, 1, activeFilter, browseLanguage)
-        .then((d) => d || [])
-        .catch(() => []);
+      // Category lists and the "Others" list load together (one round trip, not two)
+      const [catLists, others] = await Promise.all([
+        Promise.all(
+          cats.map((c) =>
+            api
+              .getPrecreatedStories(c.id, ageId, 1, activeFilter, browseLanguage)
+              .then((d) => d || [])
+              .catch(() => [])
+          )
+        ),
+        api
+          .getPrecreatedStories("others", ageId, 1, activeFilter, browseLanguage)
+          .then((d) => d || [])
+          .catch(() => []),
+      ]);
       const rows = cats.map((c, i) => ({ category: c, stories: catLists[i] }));
       if (others.length > 0) {
         rows.push({ category: { id: "others", name: "Others", icon_url: "📦" }, stories: others });
@@ -341,9 +370,11 @@ export default function HomeFeedScreen({
         });
       });
       const nonEmpty = rows.filter((r) => r.stories.length > 0);
+      const flat = nonEmpty.flatMap((r) => r.stories);
+      FEED_CACHE[key] = { at: Date.now(), cats, rows: nonEmpty, stories: flat };
       setCategories(cats);
       setFeedRows(nonEmpty);
-      setStories(nonEmpty.flatMap((r) => r.stories));
+      setStories(flat);
     } catch (e) {
       console.warn("Failed to load library", e);
     } finally {
@@ -582,7 +613,8 @@ export default function HomeFeedScreen({
       setLangProgress("");
 
       closeGenerateModal();
-      loadStories();
+      clearFeedCache();
+      loadStories(true);
       if (langFailures.length) {
         notifyError("Story published, but some languages failed:\n" + langFailures.join("\n"));
         return;
@@ -819,6 +851,7 @@ export default function HomeFeedScreen({
 
       const applyUpdate = (list) =>
         list ? list.map((s) => (s.id === editingStoryId ? { ...s, ...updated } : s)) : list;
+      clearFeedCache();
       setStories((prev) => applyUpdate(prev));
       setFeedRows((prev) => prev.map((r) => ({ ...r, stories: applyUpdate(r.stories) })));
       setDbResults((prev) => applyUpdate(prev));
@@ -859,6 +892,7 @@ export default function HomeFeedScreen({
       try {
         await api.deleteStory(story.id);
         const filterOut = (list) => (list ? list.filter((s) => s.id !== story.id) : list);
+        clearFeedCache();
         setStories((prev) => filterOut(prev));
         setFeedRows((prev) => prev.map((r) => ({ ...r, stories: filterOut(r.stories) })).filter((r) => r.stories.length > 0));
         setDbResults((prev) => filterOut(prev));
@@ -942,7 +976,7 @@ export default function HomeFeedScreen({
                 ? `No stories in ${languageByCode(browseLanguage).label} yet. Check back soon!`
                 : "No stories yet for this age. Check back soon!"}
             </Text>
-            <TouchableOpacity style={styles.chip} onPress={loadStories}>
+            <TouchableOpacity style={styles.chip} onPress={() => loadStories(true)}>
               <Text style={styles.chipText}>Retry</Text>
             </TouchableOpacity>
           </View>
@@ -2049,6 +2083,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
+  ratingBadge: {
+    position: "absolute",
+    left: 7,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  ratingBadgeText: { color: "#ffd24a", fontSize: 10, fontWeight: "900" },
   langBadge: {
     position: "absolute",
     right: 7,

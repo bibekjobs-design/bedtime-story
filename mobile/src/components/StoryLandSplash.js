@@ -7,12 +7,14 @@ import SafeAudio from "../utils/safeAudio";
 const DOOR_SOUND = require("../../assets/sounds/door_lock.mp3");
 
 // Shown right after login, before the profile picker: the letters of
-// STORY (red capitals): each letter comes running in from the left or right
+// STORY LAND (red capitals): each letter comes running in from the left or right
 // side and joins the word, then the whole word fades into the dark background.
-const WORDS = ["STORY"];
+const WORDS = ["STORY", "LAND"];
 
 export default function StoryLandSplash({ onDone }) {
   const { width } = useWindowDimensions();
+  // One line "STORY LAND", sized to fit any phone width (56 max on wide screens).
+  const fontSize = Math.max(22, Math.min(56, Math.floor((width - 40) / 9.2)));
   const letters = [];
   WORDS.forEach((w, wi) => w.split("").forEach((ch, ci) => letters.push({ ch, wi, ci })));
 
@@ -62,7 +64,7 @@ export default function StoryLandSplash({ onDone }) {
     <View style={styles.container}>
       <Animated.View style={[styles.wordsWrap, { opacity: fade }]}>
         {WORDS.map((w, wi) => (
-          <View key={w} style={styles.wordRow}>
+          <View key={w} style={[styles.wordRow, wi > 0 && { marginLeft: fontSize * 0.45 }]}>
             {w.split("").map((ch, ci) => {
               k += 1;
               const a = anims[k];
@@ -74,7 +76,7 @@ export default function StoryLandSplash({ onDone }) {
               return (
                 <Animated.Text
                   key={`${wi}-${ci}`}
-                  style={[styles.letter, { opacity: a, transform: [{ translateX: tx }] }]}
+                  style={[styles.letter, { fontSize, letterSpacing: Math.max(1, fontSize * 0.06), opacity: a, transform: [{ translateX: tx }] }]}
                 >
                   {ch}
                 </Animated.Text>
@@ -94,7 +96,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  wordsWrap: { alignItems: "center" },
+  wordsWrap: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
   wordRow: { flexDirection: "row" },
   letter: {
     color: "#e50914",

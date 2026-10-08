@@ -823,10 +823,11 @@ def get_home_feed(age_group_id: int = 1, sort_by: str = "popular", language_code
     supabase = get_supabase()
     cats = supabase.table("story_categories").select("*").eq("is_active", True).execute().data or []
 
+    # The whole shared library is shown to every user, with or without a child
+    # profile / age group.
     query = (
         supabase.table("story_texts")
         .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings")
-        .eq("age_group_id", age_group_id)
         .is_("owner_user_id", "null")
     )
     if sort_by == "newest":

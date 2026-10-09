@@ -491,19 +491,6 @@ export default function PlayerScreen({ story, onBack, onSwitchLanguage }) {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={handleDownloadOffline}
-              disabled={downloading}
-            >
-              {downloading ? (
-                <ActivityIndicator size="small" color={colors.sliderThumb} />
-              ) : (
-                <Text style={styles.actionIcon}>
-                  {isDownloaded ? "✅ Saved" : "⬇️ Offline"}
-                </Text>
-              )}
-            </TouchableOpacity>
           </View>
         </View>
 

@@ -560,12 +560,12 @@ export default function HomeFeedScreen({
       const formData = new FormData();
       formData.append("title", manualTitle.trim());
       formData.append("full_text", manualText.trim());
-      formData.append("category_id", generateCategoryId);
+      formData.append("category_id", String(generateCategoryId));
       formData.append("age_group_id", String(ageId));
       formData.append("language_id", "1");
       formData.append("language_code", selectedLanguage);
-      formData.append("voice_id", selectedVoiceId || "luna");
-      formData.append("accent_id", selectedAccentId || "us");
+      formData.append("voice_id", String(selectedVoiceId || "luna"));
+      formData.append("accent_id", String(selectedAccentId || "us"));
 
       if (coverImage) {
         const uri = coverImage.uri;

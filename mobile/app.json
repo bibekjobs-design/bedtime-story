@@ -18,7 +18,11 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "web": {
@@ -31,6 +35,11 @@
           "microphonePermission": "STORYLAND needs the microphone so a parent can record their voice for bedtime stories."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f0b8c787-3443-4107-8306-28f97a143b37"
+      }
+    }
   }
 }

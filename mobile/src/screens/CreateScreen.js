@@ -227,10 +227,10 @@ export default function CreateScreen({
     try {
       const formData = new FormData();
       formData.append("input_mode", "file");
-      formData.append("age_group_id", activeProfile?.age_group_id || 1);
-      formData.append("voice_id", selectedVoiceId);
-      formData.append("accent_id", selectedAccentId);
-      formData.append("language_code", voiceSource === "clone" ? "en" : languageCode);
+      formData.append("age_group_id", String(activeProfile?.age_group_id || 1));
+      formData.append("voice_id", String(selectedVoiceId));
+      formData.append("accent_id", String(selectedAccentId));
+      formData.append("language_code", String(voiceSource === "clone" ? "en" : languageCode));
       if (usingPageRange) {
         formData.append("pdf_page_from", String(pageFromNum));
         formData.append("pdf_page_to", String(pageToNum));

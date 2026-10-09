@@ -12,6 +12,16 @@ import {
 import { colors } from "../theme/colors";
 import { api } from "../api/client";
 
+// Native (phone) recording uses expo-audio; the web build keeps using the browser MediaRecorder.
+let ExpoAudio = null;
+if (Platform.OS !== "web") {
+  try {
+    ExpoAudio = require("expo-audio");
+  } catch (e) {
+    console.warn("expo-audio not available:", e && e.message);
+  }
+}
+
 const TARGET_SECONDS = 23; // 1.5x the original 15s - the read-aloud script needs ~16s at a normal pace
 
 export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated }) {
@@ -29,6 +39,7 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
   const audioChunksRef = useRef([]);
   const timerIntervalRef = useRef(null);
   const playbackAudioRef = useRef(null);
+  const nativeRecorderRef = useRef(null);
 
   useEffect(() => {
     if (!visible) {
@@ -42,10 +53,11 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
     }
+    releaseNativeRecorder();
     setIsRecording(false);
     setRecordedBlob(null);
     if (recordedAudioUrl) {
-      URL.revokeObjectURL(recordedAudioUrl);
+      if (Platform.OS === "web") URL.revokeObjectURL(recordedAudioUrl);
       setRecordedAudioUrl(null);
     }
     setSecondsRecorded(0);
@@ -54,15 +66,30 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
     setIsSubmitting(false);
   }
 
+  function releaseNativeRecorder() {
+    const rec = nativeRecorderRef.current;
+    nativeRecorderRef.current = null;
+    if (rec) {
+      try {
+        if (rec.isRecording) rec.stop();
+      } catch (e) {}
+      try {
+        if (rec.release) rec.release();
+      } catch (e) {}
+    }
+  }
+
   async function startRecording() {
     setErrorMessage("");
     audioChunksRef.current = [];
     setSecondsRecorded(0);
     setRecordedBlob(null);
     if (recordedAudioUrl) {
-      URL.revokeObjectURL(recordedAudioUrl);
+      if (Platform.OS === "web") URL.revokeObjectURL(recordedAudioUrl);
       setRecordedAudioUrl(null);
     }
+    stopPlayback();
+    releaseNativeRecorder();
 
     try {
       if (Platform.OS === "web") {
@@ -103,32 +130,69 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
           }
         }, 1000);
       } else {
-        // Mock fallback for native environments without permissions configured yet
+        if (!ExpoAudio) {
+          setErrorMessage("Recording is not available in this app build.");
+          return;
+        }
+        const perm = await ExpoAudio.requestRecordingPermissionsAsync();
+        if (!perm || !perm.granted) {
+          setErrorMessage(
+            "Microphone permission is needed. Please allow it in your phone Settings > Apps > STORYLAND > Permissions."
+          );
+          return;
+        }
+        await ExpoAudio.setAudioModeAsync({
+          allowsRecording: true,
+          playsInSilentMode: true,
+        });
+        const recorder = new ExpoAudio.AudioModule.AudioRecorder(
+          ExpoAudio.RecordingPresets.HIGH_QUALITY
+        );
+        nativeRecorderRef.current = recorder;
+        await recorder.prepareToRecordAsync();
+        recorder.record();
         setIsRecording(true);
-        let elapsed = 0;
+
+        let elapsedNative = 0;
         timerIntervalRef.current = setInterval(() => {
-          elapsed += 1;
-          setSecondsRecorded(elapsed);
-          if (elapsed >= TARGET_SECONDS) {
-            clearInterval(timerIntervalRef.current);
-            setIsRecording(false);
-            const mockBlob = new Blob([new Uint8Array(5000)], { type: "audio/mp3" });
-            setRecordedBlob(mockBlob);
+          elapsedNative += 1;
+          setSecondsRecorded(elapsedNative);
+          if (elapsedNative >= TARGET_SECONDS) {
+            stopRecording();
           }
         }, 1000);
       }
     } catch (err) {
       setErrorMessage(
-        "Could not access microphone. Please allow microphone permission in your browser."
+        "Could not access microphone. Please allow microphone permission and try again."
       );
       setIsRecording(false);
     }
   }
 
-  function stopRecording() {
+  async function stopRecording() {
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    timerIntervalRef.current = null;
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
+    }
+    const rec = nativeRecorderRef.current;
+    if (rec) {
+      try {
+        await rec.stop();
+        const uri = rec.uri;
+        if (uri) {
+          setRecordedBlob({ uri, native: true });
+          setRecordedAudioUrl(uri);
+        } else {
+          setErrorMessage("Recording failed. Please try again.");
+        }
+      } catch (e) {
+        setErrorMessage("Recording failed. Please try again.");
+      }
+      try {
+        await ExpoAudio.setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      } catch (e) {}
     }
     setIsRecording(false);
   }
@@ -138,19 +202,39 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
 
     if (isPlayingBack && playbackAudioRef.current) {
       stopPlayback();
-    } else {
+    } else if (Platform.OS === "web") {
       const audio = new Audio(recordedAudioUrl);
       playbackAudioRef.current = audio;
       audio.onended = () => setIsPlayingBack(false);
       audio.play();
       setIsPlayingBack(true);
+    } else if (ExpoAudio) {
+      try {
+        const player = ExpoAudio.createAudioPlayer({ uri: recordedAudioUrl });
+        playbackAudioRef.current = player;
+        player.addListener("playbackStatusUpdate", (st) => {
+          if (st && st.didJustFinish) stopPlayback();
+        });
+        player.play();
+        setIsPlayingBack(true);
+      } catch (e) {
+        setErrorMessage("Could not play the sample.");
+      }
     }
   }
 
   function stopPlayback() {
-    if (playbackAudioRef.current) {
-      playbackAudioRef.current.pause();
-      playbackAudioRef.current = null;
+    const p = playbackAudioRef.current;
+    playbackAudioRef.current = null;
+    if (p) {
+      try {
+        p.pause();
+      } catch (e) {}
+      if (Platform.OS !== "web") {
+        try {
+          p.remove();
+        } catch (e) {}
+      }
     }
     setIsPlayingBack(false);
   }
@@ -176,7 +260,15 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
       const formData = new FormData();
       formData.append("label", voiceName.trim());
       formData.append("consent", "true");
-      formData.append("audio_file", recordedBlob, "voice_sample.webm");
+      if (Platform.OS === "web") {
+        formData.append("audio_file", recordedBlob, "voice_sample.webm");
+      } else {
+        formData.append("audio_file", {
+          uri: recordedBlob.uri,
+          name: "voice_sample.m4a",
+          type: "audio/m4a",
+        });
+      }
 
       const createdClone = await api.uploadVoiceClone(formData);
       if (onVoiceCreated) onVoiceCreated(createdClone);

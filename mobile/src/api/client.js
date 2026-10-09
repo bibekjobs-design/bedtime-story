@@ -1,6 +1,46 @@
 import { API_BASE_URL } from "./config";
 import { authStorage } from "./authStorage";
 
+import { Platform } from "react-native";
+
+// On the phone, Expo's global fetch cannot send React-Native style file parts
+// ({uri, name, type}) inside FormData - it fails with "Unsupported FormDataPart
+// implementation". For multipart requests that carry a file we use Expo's native
+// uploader instead; everything else (and the web build) uses normal fetch.
+async function formFetch(url, init) {
+  const formData = init && init.body;
+  if (Platform.OS === "web" || !formData || !Array.isArray(formData._parts)) {
+    return fetch(url, init);
+  }
+  const fileParts = formData._parts.filter(
+    (p) => p && p[1] && typeof p[1] === "object" && typeof p[1].uri === "string"
+  );
+  if (fileParts.length !== 1) {
+    return fetch(url, init);
+  }
+  const FileSystemLegacy = require("expo-file-system/legacy");
+  const [fieldName, file] = fileParts[0];
+  const parameters = {};
+  formData._parts.forEach((p) => {
+    if (p && p[0] !== fieldName) parameters[p[0]] = String(p[1]);
+  });
+  const result = await FileSystemLegacy.uploadAsync(url, file.uri, {
+    httpMethod: (init.method || "POST").toUpperCase(),
+    uploadType: FileSystemLegacy.FileSystemUploadType.MULTIPART,
+    fieldName,
+    mimeType: file.type || undefined,
+    parameters,
+    headers: init.headers || {},
+  });
+  const bodyText = result.body || "";
+  return {
+    ok: result.status >= 200 && result.status < 300,
+    status: result.status,
+    json: async () => JSON.parse(bodyText),
+    text: async () => bodyText,
+  };
+}
+
 let onUnauthorizedCallback = null;
 
 export function setOnUnauthorizedHandler(callback) {
@@ -152,7 +192,7 @@ export const api = {
     const token = await authStorage.getToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(url, {
+      const res = await formFetch(url, {
         method: "POST",
         headers,
         body: formData,
@@ -232,7 +272,7 @@ export const api = {
     const token = await authStorage.getToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(url, {
+      const res = await formFetch(url, {
         method: "POST",
         headers,
         body: formData,
@@ -267,7 +307,7 @@ export const api = {
     const token = await authStorage.getToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(url, {
+      const res = await formFetch(url, {
         method: "POST",
         headers,
         body: formData,
@@ -389,7 +429,7 @@ export const api = {
     const url = `${API_BASE_URL}/api/voice-clones/upload`;
     const token = await authStorage.getToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await fetch(url, {
+    const res = await formFetch(url, {
       method: "POST",
       headers,
       body: formData,

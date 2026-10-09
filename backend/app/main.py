@@ -69,6 +69,53 @@ def start_cloned_story_cleanup():
     threading.Thread(target=loop, daemon=True).start()
 
 
+KEEPALIVE_STATE = {"last_ok": None, "last_error": None, "count": 0}
+
+
+def _keepalive_once(source: str = "backend") -> bool:
+    """One tiny Supabase round trip so the project never looks inactive."""
+    from datetime import datetime, timedelta, timezone
+    supabase = get_supabase()
+    now = datetime.now(timezone.utc)
+    try:
+        # Preferred: leave a visible trace in keepalive_log (also proves it ran).
+        supabase.table("keepalive_log").insert({"source": source}).execute()
+        cutoff = (now - timedelta(days=30)).isoformat()
+        supabase.table("keepalive_log").delete().lt("pinged_at", cutoff).execute()
+    except Exception as e:
+        # Table not created yet: a plain read still counts as activity.
+        supabase.table("age_groups").select("id").limit(1).execute()
+        print(f"[keepalive] read-only ping (keepalive_log not available: {str(e)[:80]})")
+    KEEPALIVE_STATE["last_ok"] = now.isoformat()
+    KEEPALIVE_STATE["last_error"] = None
+    KEEPALIVE_STATE["count"] += 1
+    print(f"[keepalive] Supabase ping OK at {now.isoformat()}")
+    return True
+
+
+@app.on_event("startup")
+def start_supabase_keepalive():
+    """Pings Supabase shortly after start and then every KEEPALIVE_HOURS (default 12)."""
+    import os, threading, time
+
+    try:
+        hours = float(os.environ.get("KEEPALIVE_HOURS", "12"))
+    except ValueError:
+        hours = 12.0
+
+    def loop():
+        time.sleep(20)  # let the server finish starting
+        while True:
+            try:
+                _keepalive_once()
+            except Exception as e:
+                KEEPALIVE_STATE["last_error"] = str(e)[:200]
+                print(f"[keepalive] ping failed (will retry next cycle): {e}")
+            time.sleep(max(300.0, hours * 3600))
+
+    threading.Thread(target=loop, daemon=True).start()
+
+
 @app.get("/")
 def read_root():
     return {
@@ -106,4 +153,5 @@ def health_check(response: Response):
         health_data["status"] = "degraded"
         health_data["database"] = f"connection_failed: {str(exc)}"
 
+    health_data["keepalive"] = KEEPALIVE_STATE
     return health_data

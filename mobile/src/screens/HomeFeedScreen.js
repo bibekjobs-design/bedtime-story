@@ -156,11 +156,6 @@ function StoryCard({ story, width, height, onPress, busy, showNew, isAdmin, onEd
       <Text style={styles.cardTitle} numberOfLines={3}>
         {story.title}
       </Text>
-      {Array.isArray(story.language_codes) && story.language_codes.length > 1 ? (
-        <View style={styles.langBadge}>
-          <Text style={styles.langBadgeText}>{story.language_codes.map((c) => c.toUpperCase()).join(" · ")}</Text>
-        </View>
-      ) : null}
       {Number(story.total_ratings) > 0 && Number(story.average_rating) > 0 ? (
         <View style={[styles.ratingBadge, { top: showNew ? 30 : 7 }]}>
           <Text style={styles.ratingBadgeText}>⭐ {Number(story.average_rating).toFixed(1)}</Text>
@@ -976,7 +971,7 @@ export default function HomeFeedScreen({
             <Text style={styles.emptyText}>
               {browseLanguage !== "en"
                 ? `No stories in ${languageByCode(browseLanguage).label} yet. Check back soon!`
-                : "No stories yet for this age. Check back soon!"}
+                : "No stories yet. Check back soon!"}
             </Text>
             <TouchableOpacity style={styles.chip} onPress={() => loadStories(true)}>
               <Text style={styles.chipText}>Retry</Text>

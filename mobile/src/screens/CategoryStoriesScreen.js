@@ -85,7 +85,16 @@ export default function CategoryStoriesScreen({
     setLoading(true);
     try {
       const ageId = activeProfile?.age_group_id || 1;
-      const data = await api.getPrecreatedStories(category.id, ageId, 1, "newest", browseLanguage);
+      let data = null;
+      try {
+        // Same whole-library feed as Home, so a category never looks empty
+        // just because of the child's age group.
+        const feed = await api.getHomeFeed(ageId, "newest", browseLanguage);
+        const row = (feed.rows || []).find((r) => String(r.category?.id) === String(category.id));
+        data = row ? row.stories : [];
+      } catch (feedErr) {
+        data = await api.getPrecreatedStories(category.id, ageId, 1, "newest", browseLanguage);
+      }
       setStories(data || []);
     } catch (e) {
       console.warn("Failed to load category stories", e);

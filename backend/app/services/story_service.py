@@ -968,7 +968,6 @@ def _search_core(
     db_query = (
         supabase.table("story_texts")
         .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings")
-        .eq("age_group_id", age_group_id)
         .is_("owner_user_id", "null")
     )
     if category_id:
@@ -979,7 +978,6 @@ def _search_core(
     db_teaser_query = (
         supabase.table("story_texts")
         .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings")
-        .eq("age_group_id", age_group_id)
         .is_("owner_user_id", "null")
     )
     if category_id:

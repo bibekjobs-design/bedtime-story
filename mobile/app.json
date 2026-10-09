@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Bedtime Story",
+    "name": "STORYLAND",
     "slug": "bedtime-story",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,19 +10,27 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.bibekjobs.bedtimestory",
+      "package": "com.storyland.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "permissions": [
+        "RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-audio"
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "STORYLAND needs the microphone so a parent can record their voice for bedtime stories."
+        }
+      ]
     ]
   }
 }

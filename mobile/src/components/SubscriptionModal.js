@@ -318,7 +318,7 @@ export default function SubscriptionModal({
               )}
 
               <View style={styles.secureRow}>
-                <Text style={styles.secureText}>🔒 Payments are securely processed by Razorpay</Text>
+                <Text style={styles.secureText}>🔒 Payments are securely processed by Google Play</Text>
               </View>
 
               {/* Billing choice: auto-renew vs one month only */}

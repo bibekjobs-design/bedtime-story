@@ -34,44 +34,45 @@ const PLANS = {
   normal: {
     id: "normal_monthly",
     label: "Normal",
-    price: 99,
+    price: 111,
     originalPrice: null,
-    tagline: "Listen to every story in the Library, anytime",
+    tagline: "A gentle start with a limited set of stories",
     emoji: "📖",
     benefits: [
-      { icon: "🎧", text: "Unlimited Library Stories & offline playback" },
-      { icon: "🧸", text: "Unlimited Child Profiles with custom sleep timers" },
-      { icon: "🌲", text: "All 5 Story-Matched HD Soundscapes" },
-      { icon: "🔒", text: "Listening only - creating new stories is part of Pro and Super" },
+      { icon: "🎧", text: "Limited stories to listen to (Pro and Super unlock every story)" },
+      { icon: "🧸", text: "Unlimited Child Profiles" },
+      { icon: "⏱️", text: "Sleep timer - the story stops by itself once your child is asleep" },
+      { icon: "🌲", text: "Calming background sounds matched to every story" },
     ],
   },
   pro: {
     id: "pro151_monthly",
     label: "Pro",
-    price: 151,
+    price: 161,
     originalPrice: null,
-    tagline: "Everything in Normal, plus AI-narrated stories you create",
+    tagline: "Listen to every story in the Library, anytime",
     emoji: "✨",
     benefits: [
-      { icon: "🎧", text: "Unlimited Library Stories & offline playback" },
-      { icon: "✨", text: "5 Custom AI Stories / month, narrated by Luna & friends (up to 3 min each)" },
-      { icon: "🧸", text: "Unlimited Child Profiles with custom sleep timers" },
-      { icon: "🌲", text: "All 5 Story-Matched HD Soundscapes" },
+      { icon: "🎧", text: "Listen to every story in the Library" },
+      { icon: "🧸", text: "Unlimited Child Profiles" },
+      { icon: "⏱️", text: "Sleep timer - the story stops by itself once your child is asleep" },
+      { icon: "🌲", text: "Calming background sounds matched to every story" },
     ],
   },
   super: {
     id: "super_monthly",
     label: "Super",
-    price: 219,
-    originalPrice: 299,
-    tagline: "Everything in Pro, plus parent voice cloning",
+    price: 321,
+    originalPrice: null,
+    tagline: "Everything in Pro, plus create your own stories and parent voice cloning",
     emoji: "👑",
     benefits: [
-      { icon: "🎧", text: "Unlimited Library Stories & offline playback" },
-      { icon: "✨", text: "8 Custom AI Stories / month (up to 5 min each)" },
+      { icon: "🎧", text: "Listen to every story in the Library" },
+      { icon: "✨", text: "5 Custom AI Stories / month, narrated by Luna & friends (up to 5 min each)" },
       { icon: "🎙️", text: "4 Parent Voice Cloned Stories / month (up to ~3 min / 2,430 characters each)" },
-      { icon: "🧸", text: "Unlimited Child Profiles with custom sleep timers" },
-      { icon: "🌲", text: "All 5 Story-Matched HD Soundscapes" },
+      { icon: "🧸", text: "Unlimited Child Profiles" },
+      { icon: "⏱️", text: "Sleep timer - the story stops by itself once your child is asleep" },
+      { icon: "🌲", text: "Calming background sounds matched to every story" },
     ],
   },
 };
@@ -134,7 +135,7 @@ export default function SubscriptionModal({
       ...(isAutopay
         ? { subscription_id: order.subscription_id }
         : { amount: order.amount_paise, currency: order.currency, order_id: order.order_id }),
-      name: `Bedtime Story ${plan.label}`,
+      name: `STORYLAND ${plan.label}`,
       description: `Monthly ${plan.label} Subscription`,
       prefill: {
         email: order.prefill_email || "",
@@ -172,7 +173,7 @@ export default function SubscriptionModal({
       RazorpayCheckout = require("react-native-razorpay").default;
     } catch (e) {
       setError(
-        "In-app payment isn't set up for this device build yet. Please open Bedtime Story in a web browser to subscribe for now."
+        "In-app payment isn't set up for this device build yet. Please open STORYLAND in a web browser to subscribe for now."
       );
       setProcessing(false);
       return;
@@ -184,7 +185,7 @@ export default function SubscriptionModal({
         ...(isAutopay
           ? { subscription_id: order.subscription_id }
           : { amount: order.amount_paise, currency: order.currency, order_id: order.order_id }),
-        name: `Bedtime Story ${plan.label}`,
+        name: `STORYLAND ${plan.label}`,
         description: `Monthly ${plan.label} Subscription`,
         prefill: {
           email: order.prefill_email || "",
@@ -241,7 +242,7 @@ export default function SubscriptionModal({
           <View style={styles.modalHeader}>
             <View style={styles.badgeRow}>
               <Text style={styles.crownEmoji}>{plan.emoji}</Text>
-              <Text style={styles.planBadge}>Bedtime Story {plan.label}</Text>
+              <Text style={styles.planBadge}>STORYLAND {plan.label}</Text>
             </View>
             <TouchableOpacity style={styles.closeBtn} onPress={resetAndClose}>
               <Text style={styles.closeBtnText}>✕</Text>
@@ -253,7 +254,7 @@ export default function SubscriptionModal({
               <Text style={styles.successEmoji}>🎉</Text>
               <Text style={styles.successTitle}>Subscription Activated!</Text>
               <Text style={styles.successDesc}>
-                Welcome to Bedtime Story {plan.label}. {plan.tagline}.
+                Welcome to STORYLAND {plan.label}. {plan.tagline}.
               </Text>
             </View>
           ) : (

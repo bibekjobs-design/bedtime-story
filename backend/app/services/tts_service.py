@@ -148,7 +148,7 @@ INDIAN_LANGS = {
 }
 GEMINI_TTS_MODEL = "gemini-2.5-flash-tts"
 GEMINI_VOICE_FOR_PERSONA = {"luna": "Aoede", "oliver": "Charon", "willow": "Kore", "jasper": "Puck"}
-GEMINI_STYLE_PROMPT = "Read this aloud as a warm, gentle, soothing bedtime story for a young child, slowly and calmly."
+GEMINI_STYLE_PROMPT = "Read this aloud as a warm, gentle, soothing bedtime story for a young child, at a natural, gentle, calm pace - not slow."
 
 
 def _lang_key(language_code: str) -> str:
@@ -187,7 +187,7 @@ def synthesize_story_audio(
         candidates.append((locale, f"{locale}-Neural2-{gender_letter}", None, False))
         candidates.append(("en-US", "en-US-Neural2-D" if is_male else "en-US-Neural2-F", None, False))
         max_chars = 900
-        speaking_rate = 0.85
+        speaking_rate = 0.97
     else:
         cfg = INDIAN_LANGS[lang]
         locale = cfg["locale"]
@@ -201,7 +201,7 @@ def synthesize_story_audio(
             candidates.append((locale, f"{locale}-{persona}", None, False))
             candidates.append((locale, cfg["fallback_m"] if is_male else cfg["fallback_f"], None, False))
             max_chars = 700
-        speaking_rate = 0.88
+        speaking_rate = 0.97
 
     chunks = chunk_text(full_text, max_chars=max_chars)
     audio_segments = []
@@ -258,7 +258,7 @@ def synthesize_story_audio(
 
     full_audio_bytes = b"".join(audio_segments)
     word_count = len(full_text.split())
-    duration_seconds = max(10, int((word_count / 135.0) * 60))
+    duration_seconds = max(10, int((word_count / 150.0) * 60))
 
     return full_audio_bytes, duration_seconds
 

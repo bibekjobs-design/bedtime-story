@@ -65,7 +65,7 @@ async def upload_voice_clone(
     Uploads parent voice sample (MP3/WAV/M4A), stores in Supabase Storage,
     and registers with ElevenLabs voice cloning provider.
     Registering a clone is a real per-clone cost with ElevenLabs, so this is
-    strictly a Premium feature (₹219/month) - free users can see the option
+    strictly a Premium feature (₹321/month) - free users can see the option
     but are asked to subscribe before we actually create the clone.
     """
     tier = current_user.get("subscription_tier", "free")
@@ -75,7 +75,7 @@ async def upload_voice_clone(
     if not is_admin and tier not in ("premium", "premium_monthly", "premium_annual"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Voice cloning is a Super feature. Upgrade to the ₹219/month Super plan to clone your voice for bedtime stories!"
+            detail="Voice cloning is a Super feature. Upgrade to the ₹321/month Super plan to clone your voice for bedtime stories!"
         )
 
     if (consent or "").strip().lower() != "true":
@@ -114,7 +114,7 @@ async def narrate_cloned(
     """
     Generates bedtime narration using the parent's cloned voice,
     caching the result privately in personalized_stories.
-    Strictly restricted to Premium subscribers (₹219/month).
+    Strictly restricted to Premium subscribers (₹321/month).
     """
     tier = current_user.get("subscription_tier", "free")
     email = (current_user.get("email") or "").lower().strip()
@@ -126,7 +126,7 @@ async def narrate_cloned(
     if not is_admin and tier not in ("premium", "premium_monthly", "premium_annual"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Parent voice clone narration is a Super feature. Upgrade to the ₹219/month Super plan to narrate stories in your voice!"
+            detail="Parent voice clone narration is a Super feature. Upgrade to the ₹321/month Super plan to narrate stories in your voice!"
         )
 
     try:
@@ -161,5 +161,8 @@ def delete_voice_clone(clone_id: str, current_user: dict = Depends(get_current_u
 
     full = supabase.table("voice_clones").select("*").eq("id", clone_id).execute().data
     if full:
-        delete_clone_everywhere(supabase, full[0])
+        try:
+            delete_clone_everywhere(supabase, full[0])
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Could not delete voice: {e}")
     return

@@ -210,7 +210,7 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
       setIsPlayingBack(true);
     } else if (ExpoAudio) {
       try {
-        const player = ExpoAudio.createAudioPlayer({ uri: recordedAudioUrl });
+        const player = ExpoAudio.createAudioPlayer(recordedAudioUrl);
         playbackAudioRef.current = player;
         player.addListener("playbackStatusUpdate", (st) => {
           if (st && st.didJustFinish) stopPlayback();
@@ -232,7 +232,7 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
       } catch (e) {}
       if (Platform.OS !== "web") {
         try {
-          p.remove();
+          if (p.release) p.release();
         } catch (e) {}
       }
     }

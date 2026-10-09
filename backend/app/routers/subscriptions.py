@@ -661,7 +661,7 @@ def verify_subscription_payment(
         "is_subscribed": True,
         "expires_at": expires_at.isoformat(),
         "unlocked_features": {
-            "custom_stories_per_month": 8 if is_super else (5 if is_pro_plan else 0),
+            "custom_stories_per_month": 5 if is_super else 0,
             "voice_clones_per_month": 4 if is_super else 0,
             "unlimited_library_access": True,
             "unlimited_children_profiles": True,

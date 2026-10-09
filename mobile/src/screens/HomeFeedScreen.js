@@ -130,7 +130,7 @@ function isNewStory(story) {
 
 // One story card: real cover picture if there is one, otherwise the
 // emoji placeholder. A broken picture link falls back to the placeholder.
-function StoryCard({ story, width, height, onPress, busy, showNew, isAdmin, onEdit, onDelete, deleting }) {
+function StoryCard({ story, width, height, onPress, busy, showNew, isAdmin, onEdit, onDelete, deleting, locked }) {
   const [broken, setBroken] = useState(false);
   const hasCover =
     !broken && typeof story.cover_image_url === "string" && story.cover_image_url.startsWith("http");
@@ -171,6 +171,15 @@ function StoryCard({ story, width, height, onPress, busy, showNew, isAdmin, onEd
           <ActivityIndicator color="#fff" />
         </View>
       ) : null}
+      {locked ? (
+        <View style={styles.lockBadge} pointerEvents="none">
+          <Text style={styles.lockBadgeText}>🔒</Text>
+        </View>
+      ) : isAdmin && story.access_level === "pro" ? (
+        <View style={styles.lockBadge} pointerEvents="none">
+          <Text style={styles.lockBadgeText}>PRO</Text>
+        </View>
+      ) : null}
       {isAdmin ? (
         <View style={styles.feedAdminBtns}>
           <TouchableOpacity style={styles.feedAdminBtn} disabled={deleting} onPress={onEdit}>
@@ -193,8 +202,17 @@ export default function HomeFeedScreen({
   onOpenCategory,
   browseLanguage = "en",
   onBrowseLanguageChange,
+  onGoToUpgrade,
 }) {
   const isAdmin = !!currentUser?.is_admin;
+  // Stories the admin marked "Pro / Super only" are locked for Normal-plan listeners.
+  const isLockedStory = (story) =>
+    !isAdmin &&
+    story &&
+    story.access_level === "pro" &&
+    ["normal_monthly", "free_expired"].includes(currentUser?.subscription_tier);
+  const [accessLevel, setAccessLevel] = useState(null);
+  const [editAccessLevel, setEditAccessLevel] = useState(null);
 
   const initialCache = FEED_CACHE[feedKey(activeProfile?.age_group_id || 1, "popular", browseLanguage)];
   const [stories, setStories] = useState(initialCache ? initialCache.stories : []);
@@ -449,10 +467,18 @@ export default function HomeFeedScreen({
   // ambient background track is heard.
   async function handleSelectStory(story) {
     if (narratingId) return; // already narrating one, ignore extra taps
+    if (isLockedStory(story)) {
+      if (onGoToUpgrade) onGoToUpgrade();
+      return;
+    }
     setNarratingId(story.id);
     try {
       onPlayStory(await openStoryInView(api, story));
     } catch (e) {
+      if (String(e.message || "").startsWith("UPGRADE_REQUIRED")) {
+        if (onGoToUpgrade) onGoToUpgrade();
+        return;
+      }
       notifyError(e.message || "Couldn't load this story's narration. Please try again.");
     } finally {
       setNarratingId(null);
@@ -472,6 +498,7 @@ export default function HomeFeedScreen({
     setNewCategoryName("");
     setManualTitle("");
     setManualText("");
+    setAccessLevel(null);
     setSelectedVoiceId("luna");
     setSelectedAccentId("us");
     setSelectedLanguage("en");
@@ -553,6 +580,10 @@ export default function HomeFeedScreen({
       notifyError("Please enter the full story text (at least a few sentences).");
       return;
     }
+    if (accessLevel !== "normal" && accessLevel !== "pro") {
+      notifyError("Please choose who can listen: Normal, or Pro / Super only.");
+      return;
+    }
     setPublishingManual(true);
     try {
       const ageId = activeProfile?.age_group_id || 1;
@@ -566,6 +597,7 @@ export default function HomeFeedScreen({
       formData.append("language_code", selectedLanguage);
       formData.append("voice_id", String(selectedVoiceId || "luna"));
       formData.append("accent_id", String(selectedAccentId || "us"));
+      formData.append("access_level", accessLevel);
 
       if (coverImage) {
         const uri = coverImage.uri;
@@ -661,6 +693,7 @@ export default function HomeFeedScreen({
   async function handleOpenEdit(story) {
     setEditingStoryId(story.id);
     setEditTitle(story.title || "");
+    setEditAccessLevel(story.access_level || null);
     setEditText("");
     setEditCoverImage(null);
     setEditCoverImageUrl(story.cover_image_url || null);
@@ -674,6 +707,7 @@ export default function HomeFeedScreen({
     try {
       const detail = await api.getStoryAdminDetail(story.id);
       setEditTitle(detail.title || "");
+      if (detail.access_level) setEditAccessLevel(detail.access_level);
       setEditText(detail.full_text || "");
       setEditCoverImageUrl(detail.cover_image_url || null);
       try {
@@ -693,6 +727,7 @@ export default function HomeFeedScreen({
   function closeEditModal() {
     setShowEditModal(false);
     setEditingStoryId(null);
+    setEditAccessLevel(null);
     setEditTitle("");
     setEditText("");
     setEditCoverImage(null);
@@ -788,6 +823,7 @@ export default function HomeFeedScreen({
       const formData = new FormData();
       formData.append("title", editTitle.trim());
       formData.append("full_text", editText.trim());
+      if (editAccessLevel) formData.append("access_level", editAccessLevel);
       if (editRemoveCover) {
         formData.append("remove_cover_image", "true");
       }
@@ -988,6 +1024,7 @@ export default function HomeFeedScreen({
               busy={narratingId === hero.id}
               showNew={isNewStory(hero)}
               onPress={() => handleSelectStory(hero)}
+              locked={isLockedStory(hero)}
               isAdmin={isAdmin}
               onEdit={() => handleOpenEdit(hero)}
               onDelete={() => handleDeleteStory(hero)}
@@ -1017,6 +1054,7 @@ export default function HomeFeedScreen({
                     busy={narratingId === story.id}
                     showNew={isNewStory(story)}
                     onPress={() => handleSelectStory(story)}
+                    locked={isLockedStory(story)}
                     isAdmin={isAdmin}
                     onEdit={() => handleOpenEdit(story)}
                     onDelete={() => handleDeleteStory(story)}
@@ -1202,6 +1240,25 @@ export default function HomeFeedScreen({
                   is used - and saved for every parent to enjoy.
                 </Text>
                 <ScrollView style={styles.modalCategoryList}>
+                  <Text style={styles.accessLabel}>Who can listen? (required)</Text>
+                  <View style={styles.accessRow}>
+                    <TouchableOpacity
+                      style={[styles.pickerChip, accessLevel === "normal" && styles.pickerChipActive]}
+                      onPress={() => setAccessLevel("normal")}
+                    >
+                      <Text style={[styles.pickerChipText, accessLevel === "normal" && styles.pickerChipTextActive]}>
+                        Normal (everyone)
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.pickerChip, accessLevel === "pro" && styles.pickerChipActive]}
+                      onPress={() => setAccessLevel("pro")}
+                    >
+                      <Text style={[styles.pickerChipText, accessLevel === "pro" && styles.pickerChipTextActive]}>
+                        Pro / Super only
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                   <TextInput
                     style={styles.newCategoryInput}
                     placeholder="Story title..."
@@ -1338,8 +1395,8 @@ export default function HomeFeedScreen({
                     <Text style={styles.modalCancelText}>← Back</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.modalGenerateBtn, publishingManual && { opacity: 0.6 }]}
-                    disabled={publishingManual}
+                    style={[styles.modalGenerateBtn, (publishingManual || !accessLevel) && { opacity: 0.5 }]}
+                    disabled={publishingManual || !accessLevel}
                     onPress={handlePublishManual}
                   >
                     {publishingManual ? (
@@ -1399,6 +1456,25 @@ export default function HomeFeedScreen({
                     <ActivityIndicator size="small" color="#f5a623" style={{ marginVertical: 20 }} />
                   ) : editIsOrig ? (
                     <>
+                      <Text style={styles.accessLabel}>Who can listen?</Text>
+                      <View style={styles.accessRow}>
+                        <TouchableOpacity
+                          style={[styles.pickerChip, editAccessLevel === "normal" && styles.pickerChipActive]}
+                          onPress={() => setEditAccessLevel("normal")}
+                        >
+                          <Text style={[styles.pickerChipText, editAccessLevel === "normal" && styles.pickerChipTextActive]}>
+                            Normal (everyone)
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.pickerChip, editAccessLevel === "pro" && styles.pickerChipActive]}
+                          onPress={() => setEditAccessLevel("pro")}
+                        >
+                          <Text style={[styles.pickerChipText, editAccessLevel === "pro" && styles.pickerChipTextActive]}>
+                            Pro / Super only
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                       <TextInput
                         style={styles.newCategoryInput}
                         placeholder="Story title..."
@@ -2088,6 +2164,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
   },
+  lockBadge: {
+    position: "absolute",
+    right: 7,
+    bottom: 7,
+    backgroundColor: "rgba(0,0,0,0.72)",
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  lockBadgeText: { color: "#ffd24a", fontSize: 11, fontWeight: "900" },
+  accessLabel: { color: "#ffd24a", fontSize: 13, fontWeight: "800", marginBottom: 6 },
+  accessRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
   ratingBadgeText: { color: "#ffd24a", fontSize: 10, fontWeight: "900" },
   langBadge: {
     position: "absolute",

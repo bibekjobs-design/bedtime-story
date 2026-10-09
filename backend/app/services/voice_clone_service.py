@@ -422,7 +422,34 @@ def delete_clone_everywhere(supabase, clone: dict) -> None:
             supabase.storage.from_("story-audio").remove([f"{folder}/{n}" for n in names])
     except Exception as e:
         print(f"[voice clone] sample cleanup failed: {e}")
-    supabase.table("voice_clones").delete().eq("id", clone["id"]).execute()
+    # Stories made in this voice (and their History entries) must go first, or the
+    # database refuses to delete the voice and it "comes back" on the next refresh.
+    cid = clone["id"]
+    try:
+        stories = supabase.table("personalized_stories").select("id, audio_url").eq("voice_clone_id", cid).execute().data or []
+        for st in stories:
+            url = st.get("audio_url") or ""
+            if "/story-audio/" in url:
+                try:
+                    supabase.storage.from_("story-audio").remove([url.split("/story-audio/", 1)[1].split("?", 1)[0]])
+                except Exception as e:
+                    print(f"[voice clone] cloned story audio cleanup failed: {e}")
+            if url:
+                try:
+                    supabase.table("story_events").delete().eq("audio_url", url).execute()
+                except Exception:
+                    pass
+        supabase.table("personalized_stories").delete().eq("voice_clone_id", cid).execute()
+    except Exception as e:
+        print(f"[voice clone] cloned stories cleanup failed: {e}")
+    try:
+        supabase.table("story_events").delete().eq("voice_clone_id", cid).execute()
+    except Exception as e:
+        print(f"[voice clone] history cleanup failed: {e}")
+    supabase.table("voice_clones").delete().eq("id", cid).execute()
+    left = supabase.table("voice_clones").select("id").eq("id", cid).execute().data
+    if left:
+        raise RuntimeError("Voice could not be removed from the database.")
 
 
 def purge_expired_cloned_stories() -> int:

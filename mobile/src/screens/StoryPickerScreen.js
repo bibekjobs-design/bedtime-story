@@ -958,8 +958,8 @@ export default function StoryPickerScreen({
           <View style={styles.premiumBanner}>
             <Text style={styles.premiumBannerText}>
               {subStatus.plan_tier === "pro"
-                ? `👑 Bedtime Story Pro Active • ₹${subStatus.pro_plan_price_inr}/mo (8 Custom Stories + 4 Voice Clones)`
-                : `📖 Bedtime Story Normal Active • ₹${subStatus.normal_plan_price_inr}/mo (3 Custom Stories/mo, up to 3 min)`}
+                ? `👑 STORYLAND Pro Active • ₹${subStatus.pro_plan_price_inr}/mo (5 Custom Stories + 4 Voice Clones)`
+                : `📖 STORYLAND Normal Active • ₹${subStatus.normal_plan_price_inr}/mo (listening plan)`}
             </Text>
           </View>
         ) : subStatus.is_trial_active ? (
@@ -1204,7 +1204,7 @@ export default function StoryPickerScreen({
                   <Text style={styles.lockedEmoji}>✨ 🔒</Text>
                   <Text style={styles.lockedTitle}>Custom AI Bedtime Stories</Text>
                   <Text style={styles.lockedSubtitle}>
-                    Your free trial has ended. Subscribe to Normal (₹{subStatus?.normal_plan_price_inr || 99}/month, 3 stories) or Pro (₹{subStatus?.pro_plan_price_inr || 219}/month, 8 stories + voice cloning) to keep creating new stories!
+                    Your free trial has ended. Subscribe to Normal (₹{subStatus?.normal_plan_price_inr || 111}/month, 3 stories) or Pro (₹{subStatus?.pro_plan_price_inr || 321}/month, 8 stories + voice cloning) to keep creating new stories!
                   </Text>
                   <View style={styles.lockedBenefitsList}>
                     <Text style={styles.lockedBenefitItem}>✨ Up to 8 Original AI bedtime stories every month (Pro)</Text>
@@ -1213,7 +1213,7 @@ export default function StoryPickerScreen({
                     <Text style={styles.lockedBenefitItem}>🌲 Story-matched ambient sleep soundscapes</Text>
                   </View>
                   <TouchableOpacity style={styles.lockedUpgradeBtn} onPress={onGoToUpgrade}>
-                    <Text style={styles.lockedUpgradeBtnText}>👑 View Plans (from ₹{subStatus?.normal_plan_price_inr || 99}/mo)</Text>
+                    <Text style={styles.lockedUpgradeBtnText}>👑 View Plans (from ₹{subStatus?.normal_plan_price_inr || 111}/mo)</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.lockedExploreBtn} onPress={() => {}}>
                     <Text style={styles.lockedExploreBtnText}>🎧 Scroll up to Library</Text>
@@ -1636,7 +1636,7 @@ export default function StoryPickerScreen({
                   <Text style={styles.lockedEmoji}>🎙️ 🔒</Text>
                   <Text style={styles.lockedTitle}>Parent Voice Cloning</Text>
                   <Text style={styles.lockedSubtitle}>
-                    Narrating bedtime stories in Mom or Dad's cloned voice is a Pro feature (₹{subStatus?.pro_plan_price_inr || 219}/month) — not included in Normal.
+                    Narrating bedtime stories in Mom or Dad's cloned voice is a Pro feature (₹{subStatus?.pro_plan_price_inr || 321}/month) — not included in Normal.
                   </Text>
                   <View style={styles.lockedBenefitsList}>
                     <Text style={styles.lockedBenefitItem}>🎙️ 4 Full Parent Voice Narrations every month (up to ~3 min / 2,430 characters each)</Text>
@@ -1644,7 +1644,7 @@ export default function StoryPickerScreen({
                     <Text style={styles.lockedBenefitItem}>🌲 Background HD soundscapes mixed automatically</Text>
                   </View>
                   <TouchableOpacity style={styles.lockedUpgradeBtn} onPress={onGoToUpgrade}>
-                    <Text style={styles.lockedUpgradeBtnText}>👑 Unlock Voice Cloning (Pro, ₹{subStatus?.pro_plan_price_inr || 219}/mo)</Text>
+                    <Text style={styles.lockedUpgradeBtnText}>👑 Unlock Voice Cloning (Pro, ₹{subStatus?.pro_plan_price_inr || 321}/mo)</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.lockedExploreBtn} onPress={() => {}}>
                     <Text style={styles.lockedExploreBtnText}>🎧 Scroll up to Library</Text>

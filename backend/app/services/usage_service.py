@@ -21,16 +21,16 @@ TIER_LIMITS = {
     # Normal plan - Rs 99/month. LISTEN ONLY: the Library, but no story creation
     # and no voice cloning.
     "normal_monthly":  {"new_story_generation": 0, "voice_clone_story": 0, "personalization": 0},
-    # Pro plan (Rs 151/month): 5 AI-narrated stories/month, ~3 minutes each
+    # Pro plan (Rs 161/month): LISTEN ONLY (whole Library) - creating stories is Super only.
     # (story_service.NORMAL_TIER_TARGET_WORDS). No voice cloning.
-    "pro_monthly":     {"new_story_generation": 5, "voice_clone_story": 0, "personalization": 5},
+    "pro_monthly":     {"new_story_generation": 0, "voice_clone_story": 0, "personalization": 0},
     # Super plan (tier name premium_*) - Rs 219/month (shown as a discount off Rs 299). 8 file-generated
     # stories/month capped at ~5 minutes (see story_service.PRO_TIER_TARGET_WORDS),
     # plus 4 cloned-voice narrations/month capped per-narration at
     # CLONED_VOICE_CHAR_LIMIT chars (~3 min).
-    "premium":         {"new_story_generation": 8, "voice_clone_story": 4, "personalization": 8},
-    "premium_monthly": {"new_story_generation": 8, "voice_clone_story": 4, "personalization": 8},
-    "premium_annual":  {"new_story_generation": 8, "voice_clone_story": 4, "personalization": 8},
+    "premium":         {"new_story_generation": 5, "voice_clone_story": 4, "personalization": 5},
+    "premium_monthly": {"new_story_generation": 5, "voice_clone_story": 4, "personalization": 5},
+    "premium_annual":  {"new_story_generation": 5, "voice_clone_story": 4, "personalization": 5},
     "admin":           {"new_story_generation": 999, "voice_clone_story": 999, "personalization": 999},
     "admin_vip":       {"new_story_generation": 999, "voice_clone_story": 999, "personalization": 999},
 }

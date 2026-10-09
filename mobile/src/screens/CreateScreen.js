@@ -191,8 +191,8 @@ export default function CreateScreen({
       setError("Please select a file.");
       return;
     }
-    if (subscriptionTier === "normal_monthly") {
-      setError("Your Normal plan is for listening. Upgrade to Pro (₹151/month) to create 5 AI-narrated stories a month.");
+    if (subscriptionTier === "normal_monthly" || subscriptionTier === "pro_monthly") {
+      setError("Creating stories is a Super feature. Upgrade to Super (₹321/month) to create 5 AI-narrated stories a month.");
       if (onGoToUpgrade) onGoToUpgrade();
       return;
     }
@@ -311,7 +311,7 @@ export default function CreateScreen({
 
   const newStoryRemaining = usageInfo?.new_story_remaining ?? 10;
   const cloneRemaining = usageInfo?.voice_clone_remaining ?? 2;
-  const isLocked = subscriptionTier === "normal_monthly";
+  const isLocked = subscriptionTier === "normal_monthly" || subscriptionTier === "pro_monthly";
   const voiceTileColors = ["#6d3b8e", "#2f6f8f", "#8f4a2f", "#2f8f6a", "#8f2f5a", "#4a4f9f"];
 
   return (
@@ -332,10 +332,10 @@ export default function CreateScreen({
         {isLocked && (
           <View style={styles.lockBox}>
             <Text style={styles.lockText}>
-              🔒 Your Normal plan is for listening. Creating AI-narrated stories is part of Pro.
+              🔒 Your plan is for listening. Creating AI-narrated stories is part of Super.
             </Text>
             <TouchableOpacity style={styles.upsellBtn} onPress={onGoToUpgrade}>
-              <Text style={styles.upsellBtnText}>Upgrade to Pro (₹151/month)</Text>
+              <Text style={styles.upsellBtnText}>Upgrade to Super (₹321/month)</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -512,7 +512,7 @@ export default function CreateScreen({
               <View style={styles.upsellBox}>
                 <Text style={styles.upsellText}>🔒 Narrating in your own voice is a Super feature.</Text>
                 <TouchableOpacity style={styles.upsellBtn} onPress={onGoToUpgrade}>
-                  <Text style={styles.upsellBtnText}>Upgrade to Super (₹219/month)</Text>
+                  <Text style={styles.upsellBtnText}>Upgrade to Super (₹321/month)</Text>
                 </TouchableOpacity>
               </View>
             ) : voiceClones.length === 0 ? (

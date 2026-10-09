@@ -31,24 +31,23 @@ def _creation_limit_message(effective_tier: str, used: int, limit: int) -> str:
         return f"Monthly limit reached ({used}/{limit} stories used on Super). Your quota will reset next month."
     if effective_tier == "pro_monthly":
         return (
-            f"Monthly limit reached ({used}/{limit} stories used on Pro). "
-            "Upgrade to Super (₹219/month) for 8 stories/month + parent voice cloning!"
+            "Your Pro plan (₹161/month) is for listening to every story in the Library. "
+            "Upgrade to Super (₹321/month) to create 5 AI stories a month + parent voice cloning!"
         )
     if effective_tier == "normal_monthly":
         return (
-            "Your Normal plan (₹99/month) is for listening to the Library. "
-            "Upgrade to Pro (₹151/month) to create 5 AI-narrated stories a month, "
-            "or Super (₹219/month) for 8 stories + parent voice cloning."
+            "Your Normal plan (₹111/month) is for listening. "
+            "Upgrade to Super (₹321/month) to create 5 AI stories a month + parent voice cloning."
         )
     if effective_tier == "free_expired":
         return (
-            "Your free trial has ended. Subscribe to Pro (₹151/month, 5 stories) or "
-            "Super (₹219/month, 8 stories + voice cloning) to keep creating new stories. "
+            "Your free trial has ended. Subscribe to Super (₹321/month, 5 stories + voice cloning) "
+            "to keep creating new stories. "
             "You can still enjoy the full Library for free anytime!"
         )
     return (
         f"You have used your free trial story ({used}/{limit}). "
-        "Upgrade to Pro (₹151/month) or Super (₹219/month) to create more stories!"
+        "Upgrade to Super (₹321/month) to create more stories!"
     )
 
 ADMIN_EMAILS = {"bibekjobs@gmail.com"}
@@ -63,6 +62,37 @@ def _is_admin_user(user: Optional[dict]) -> bool:
     email = (user.get("email") or "").lower().strip()
     tier = (user.get("subscription_tier") or "").lower().strip()
     return email in ADMIN_EMAILS or tier in ("admin", "admin_vip", "superadmin")
+
+
+def _enforce_listen_access(story_text_id: str, current_user: Optional[dict]) -> None:
+    """Normal-plan users may only listen to stories marked 'normal'. Stories the admin
+    marked 'pro' need Pro / Super (or an active free trial). Admin and a user's own
+    stories are never blocked."""
+    if _is_admin_user(current_user):
+        return
+    try:
+        rows = (
+            get_supabase().table("story_texts")
+            .select("access_level, owner_user_id")
+            .eq("id", story_text_id).limit(1).execute().data
+        )
+    except Exception:
+        return
+    if not rows:
+        return
+    row = rows[0]
+    if row.get("owner_user_id") or (row.get("access_level") or "normal") != "pro":
+        return
+    from app.services.subscription_policy import is_trial_active, SUPER_TIERS, PRO_TIERS
+    tier = ((current_user or {}).get("subscription_tier") or "free").lower()
+    allowed = tier in SUPER_TIERS or tier in PRO_TIERS
+    if tier == "free" and current_user and is_trial_active(current_user.get("created_at")):
+        allowed = True
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="UPGRADE_REQUIRED: This story is for Pro and Super members. Upgrade to Pro (₹161/month) to listen to every story.",
+        )
 
 
 class StoryTeaserResponse(BaseModel):
@@ -81,6 +111,7 @@ class StoryTeaserResponse(BaseModel):
     ambient_sound: Optional[Dict[str, Any]] = None
     average_rating: Optional[float] = 5.0
     total_ratings: Optional[int] = 1
+    access_level: Optional[str] = None
     cover_image_url: Optional[str] = None
     cover_image_upload_failed: Optional[bool] = None
     created_at: Optional[str] = None
@@ -388,6 +419,7 @@ def commit_story(
     voice_id = payload.voice_id if payload else "luna"
     accent_id = payload.accent_id if payload else "us"
     language_code = payload.language_code if payload else None
+    _enforce_listen_access(story_text_id, current_user)
     try:
         if language_code:
             from app.services.story_service import get_story_in_language
@@ -500,6 +532,7 @@ async def publish_manual_story_endpoint(
     teaser: Optional[str] = Form(None),
     voice_id: Optional[str] = Form("luna"),
     accent_id: Optional[str] = Form("us", description="Accent/locale: us, gb, in, au"),
+    access_level: str = Form(..., description="Who can listen: 'normal' (everyone) or 'pro' (Pro/Super only)"),
     cover_image: Optional[UploadFile] = File(None),
     current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
@@ -532,6 +565,7 @@ async def publish_manual_story_endpoint(
             teaser=teaser,
             voice_id=voice_id or "luna",
             accent_id=accent_id or "us",
+            access_level=access_level,
             cover_image_bytes=cover_bytes,
             cover_image_mime=cover_mime,
             language_code=language_code,
@@ -576,6 +610,7 @@ async def edit_story_endpoint(
     full_text: Optional[str] = Form(None),
     teaser: Optional[str] = Form(None),
     remove_cover_image: Optional[bool] = Form(False),
+    access_level: Optional[str] = Form(None, description="normal or pro"),
     language_code: Optional[str] = Form(None, description="Edit this language version instead of the original"),
     cover_image: Optional[UploadFile] = File(None),
     current_user: Optional[dict] = Depends(get_current_user_optional),
@@ -608,6 +643,7 @@ async def edit_story_endpoint(
             cover_image_bytes=cover_bytes,
             cover_image_mime=cover_mime,
             remove_cover_image=bool(remove_cover_image),
+            access_level=access_level,
         )
     except ValueError as val_err:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(val_err))

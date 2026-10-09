@@ -16,6 +16,25 @@ import { api } from "../api/client";
 import { authStorage } from "../api/authStorage";
 import VoiceRecorderModal from "../components/VoiceRecorderModal";
 
+let ExpoAudio = null;
+if (Platform.OS !== "web") {
+  try {
+    ExpoAudio = require("expo-audio");
+  } catch (e) {}
+}
+
+function stopSamplePlayer(p) {
+  if (!p) return;
+  try {
+    p.pause();
+  } catch (e) {}
+  if (Platform.OS !== "web") {
+    try {
+      if (p.release) p.release();
+    } catch (e) {}
+  }
+}
+
 export default function ProfilesScreen({
   user,
   activeProfile,
@@ -205,16 +224,38 @@ export default function ProfilesScreen({
 
   function togglePlaySample(clone) {
     if (samplePlayingId === clone.id && sampleAudioRef.current) {
-      sampleAudioRef.current.pause();
+      stopSamplePlayer(sampleAudioRef.current);
       sampleAudioRef.current = null;
       setSamplePlayingId(null);
     } else {
       if (sampleAudioRef.current) {
-        sampleAudioRef.current.pause();
+        stopSamplePlayer(sampleAudioRef.current);
+        sampleAudioRef.current = null;
       }
       const url = clone.sample_audio_url;
       if (!url) {
-        alert("Voice sample audio is not available.");
+        Alert.alert("Voice sample", "Voice sample audio is not available.");
+        return;
+      }
+      if (Platform.OS !== "web") {
+        try {
+          if (!ExpoAudio) throw new Error("audio not available");
+          const player = ExpoAudio.createAudioPlayer(url);
+          sampleAudioRef.current = player;
+          player.addListener("playbackStatusUpdate", (st) => {
+            if (st && st.didJustFinish) {
+              stopSamplePlayer(sampleAudioRef.current);
+              sampleAudioRef.current = null;
+              setSamplePlayingId(null);
+            }
+          });
+          player.play();
+          setSamplePlayingId(clone.id);
+        } catch (e) {
+          Alert.alert("Voice sample", "Could not play the sample.");
+          sampleAudioRef.current = null;
+          setSamplePlayingId(null);
+        }
         return;
       }
       const audio = new Audio(url);
@@ -293,14 +334,21 @@ export default function ProfilesScreen({
         return updated;
       });
       if (samplePlayingId === cloneId && sampleAudioRef.current) {
-        sampleAudioRef.current.pause();
+        stopSamplePlayer(sampleAudioRef.current);
         sampleAudioRef.current = null;
         setSamplePlayingId(null);
       }
       try {
         await api.deleteVoiceClone(cloneId);
       } catch (err) {
-        console.warn("Delete voice clone warning:", err);
+        const msg = "Could not delete this voice: " + (err.message || "please try again.");
+        if (Platform.OS === "web") window.alert(msg);
+        else Alert.alert("Delete failed", msg);
+        try {
+          const fresh = await api.getVoiceClones();
+          setVoiceClones(fresh);
+          if (onVoiceClonesChange) onVoiceClonesChange(fresh);
+        } catch (e) {}
       }
     };
 
@@ -329,7 +377,7 @@ export default function ProfilesScreen({
     user?.subscription_tier
   );
   const isNormal = user?.subscription_tier === "normal_monthly";
-  const isProPlan = user?.subscription_tier === "pro_monthly"; // Rs 151
+  const isProPlan = user?.subscription_tier === "pro_monthly"; // Rs 161
   const isPaid = isPremium || isNormal || isProPlan;
 
   return (
@@ -399,12 +447,12 @@ export default function ProfilesScreen({
                   <Text style={styles.upgradeSubtitle}>
                     {isProPlan ? (
                       <>
-                        Bedtime Story Super · <Text style={styles.upgradePrice}>₹219</Text>/month{" "}
+                        STORYLAND Super · <Text style={styles.upgradePrice}>₹321</Text>/month{" "}
                         <Text style={styles.upgradeStrikePrice}>₹299</Text>
                       </>
                     ) : (
                       <>
-                        Bedtime Story Pro · <Text style={styles.upgradePrice}>₹151</Text>/month
+                        STORYLAND Pro · <Text style={styles.upgradePrice}>₹161</Text>/month
                       </>
                     )}
                   </Text>
@@ -438,7 +486,7 @@ export default function ProfilesScreen({
                     <View style={styles.upgradeBenefitRow}>
                       <Text style={styles.upgradeBenefitIcon}>🎙️</Text>
                       <Text style={styles.upgradeBenefitText}>
-                        Want Mom or Dad's own cloned voice? That's in Super (₹219/month)
+                        Want Mom or Dad's own cloned voice? That's in Super (₹321/month)
                       </Text>
                     </View>
                   </>
@@ -460,10 +508,10 @@ export default function ProfilesScreen({
               <TouchableOpacity style={styles.upgradeCta} onPress={onGoToUpgrade}>
                 <Text style={styles.upgradeCtaText}>
                   {isProPlan
-                    ? "Upgrade to Super — ₹219/month"
+                    ? "Upgrade to Super — ₹321/month"
                     : isNormal
-                    ? "Upgrade to Pro — ₹151/month"
-                    : "View Plans — from ₹99/month"}
+                    ? "Upgrade to Pro — ₹161/month"
+                    : "View Plans — from ₹111/month"}
                 </Text>
               </TouchableOpacity>
               <Text style={styles.upgradeFooterNote}>Cancel anytime. No hidden charges.</Text>
@@ -559,7 +607,7 @@ export default function ProfilesScreen({
             <Text style={styles.emptySubtitle}>
               {isPremium
                 ? "Clone your voice so bedtime stories can be narrated in Mom or Dad's comforting voice."
-                : "Clone your voice so bedtime stories can be narrated in Mom or Dad's comforting voice. This is a Super feature (₹219/month)."}
+                : "Clone your voice so bedtime stories can be narrated in Mom or Dad's comforting voice. This is a Super feature (₹321/month)."}
             </Text>
             <TouchableOpacity
               style={styles.addFirstBtn}

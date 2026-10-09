@@ -82,7 +82,7 @@ def _enforce_free_tier_tts_budget(subscription_tier: str, char_count: int) -> No
     if would_exceed_free_quota(char_count):
         raise ValueError(
             "Our free trial's narration credit for this month is fully used up right now. "
-            "Please try again next month, or upgrade to Pro (₹151/mo) or Super (₹219/mo) to keep generating stories today."
+            "Please try again next month, or upgrade to Super (₹321/mo) to keep generating stories today."
         )
 
 TRUNCATION_NOTICE = (
@@ -682,7 +682,7 @@ def _precreated_core(
         }
         query = (
             supabase.table("story_texts")
-            .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings")
+            .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings, access_level")
             .eq("age_group_id", age_group_id)
             .is_("owner_user_id", "null")
         )
@@ -696,7 +696,7 @@ def _precreated_core(
 
     query = (
         supabase.table("story_texts")
-        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings")
+        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings, access_level")
         .eq("age_group_id", age_group_id)
         .is_("owner_user_id", "null")
     )
@@ -735,7 +735,8 @@ def _precreated_core(
                 "teaser": item.get("teaser", ""),
                 "generation_status": "teaser_only",
                 "safety_check_status": "passed",
-                "times_served": 0
+                "times_served": 0,
+                "access_level": "normal",
             }).execute()
             if insert_res.data:
                 stories.extend(insert_res.data)
@@ -827,7 +828,7 @@ def get_home_feed(age_group_id: int = 1, sort_by: str = "popular", language_code
     # profile / age group.
     query = (
         supabase.table("story_texts")
-        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings")
+        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings, access_level")
         .is_("owner_user_id", "null")
     )
     if sort_by == "newest":
@@ -967,7 +968,7 @@ def _search_core(
     # 1. Search database
     db_query = (
         supabase.table("story_texts")
-        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings")
+        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings, access_level")
         .is_("owner_user_id", "null")
     )
     if category_id:
@@ -977,7 +978,7 @@ def _search_core(
     # Also search by teaser
     db_teaser_query = (
         supabase.table("story_texts")
-        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings")
+        .select("id, category_id, age_group_id, language_id, title, teaser, generation_status, times_served, cover_image_url, created_at, average_rating, total_ratings, access_level")
         .is_("owner_user_id", "null")
     )
     if category_id:
@@ -1040,6 +1041,7 @@ Return JSON: {{"title": "...", "teaser": "..."}}"""
             "category_id": resolved_category_id,
             "generation_status": "full_generated" if is_safe else "safety_rejected",
             "safety_check_status": "passed" if is_safe else "failed",
+            "access_level": "normal",
         }
         if is_safe:
             insert_payload["full_text"] = full_text
@@ -1081,6 +1083,7 @@ def publish_manual_story(
     cover_image_mime: str = None,
     language_code: str = None,
     extra_language_codes: list = None,
+    access_level: str = None,
 ) -> dict:
     """
     Admin manual publish: the admin types or pastes the story text directly
@@ -1120,6 +1123,9 @@ def publish_manual_story(
 
     teaser = sanitize_text((teaser or "").strip()) or derive_teaser_from_text(full_text)
 
+    if access_level not in ("normal", "pro"):
+        raise ValueError("Please choose who can listen to this story: Normal, or Pro/Super only.")
+
     insert_payload = {
         "title": title,
         "teaser": teaser,
@@ -1127,6 +1133,7 @@ def publish_manual_story(
         "age_group_id": age_group_id,
         "language_id": language_id,
         "category_id": category_id,
+        "access_level": access_level,
         "generation_status": "full_generated",
         # The DB column has a check constraint that only allows a fixed set
         # of values (e.g. "passed"/"failed") - "manual_admin_entry" isn't
@@ -1236,6 +1243,7 @@ def get_story_admin_detail(story_text_id: str) -> dict:
         "age_group_id": story.get("age_group_id"),
         "language_id": story.get("language_id"),
         "cover_image_url": story.get("cover_image_url"),
+        "access_level": story.get("access_level"),
         "voice_id": voice_id,
         "accent_id": accent_id,
     }
@@ -1249,6 +1257,7 @@ def update_manual_story(
     cover_image_bytes: bytes = None,
     cover_image_mime: str = None,
     remove_cover_image: bool = False,
+    access_level: str = None,
 ) -> dict:
     """
     Admin edit of an already-published story: change its title, full text,
@@ -1266,6 +1275,11 @@ def update_manual_story(
 
     update_payload = {}
     text_changed = False
+
+    if access_level is not None and access_level != "":
+        if access_level not in ("normal", "pro"):
+            raise ValueError("Who can listen must be Normal or Pro/Super only.")
+        update_payload["access_level"] = access_level
 
     if title is not None and title.strip():
         clean_title = sanitize_text(title.strip())
@@ -1468,6 +1482,7 @@ def generate_custom_story(
         "language_id": language_id,
         "generation_status": "full_generated",
         "times_served": 0,
+        "access_level": "normal",
         # Private: only the user who created this story can see it
         "owner_user_id": user_id,
     }
@@ -1769,6 +1784,7 @@ Return ONLY valid JSON: {"extracted_text": "..."}
         "language_id": language_id,
         "generation_status": "full_generated",
         "times_served": 0,
+        "access_level": "normal",
         # Private: only the user who created this story can see it
         "owner_user_id": user_id,
     }

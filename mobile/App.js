@@ -403,6 +403,7 @@ export default function App() {
           onBrowseLanguageChange={setBrowseLanguage}
           activeProfile={activeProfile}
           currentUser={currentUser}
+          onGoToUpgrade={() => setShowSubscriptionModal(true)}
           onPlayStory={(storyData) => {
             setSelectedStory(storyData);
             setPlayerOrigin("home");
@@ -423,6 +424,7 @@ export default function App() {
           category={selectedCategory}
           activeProfile={activeProfile}
           currentUser={currentUser}
+          onGoToUpgrade={() => setShowSubscriptionModal(true)}
           onPlayStory={(storyData) => {
             setSelectedStory(storyData);
             setPlayerOrigin("category");

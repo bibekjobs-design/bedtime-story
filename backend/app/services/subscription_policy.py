@@ -46,10 +46,10 @@ EXISTING_USERS_CUTOVER = datetime(2026, 10, 1, 14, 30, tzinfo=timezone.utc)  # O
 EXISTING_USERS_TRIAL_END = datetime(2026, 10, 30, 18, 30, tzinfo=timezone.utc)
 
 # Plan pricing (INR)
-NORMAL_PLAN_PRICE_INR = 99
-PRO_PLAN_PRICE_INR = 151
-SUPER_PLAN_PRICE_INR = 219
-SUPER_PLAN_ORIGINAL_PRICE_INR = 299  # shown struck-through next to the Rs 219 "discount" price
+NORMAL_PLAN_PRICE_INR = 111
+PRO_PLAN_PRICE_INR = 161
+SUPER_PLAN_PRICE_INR = 321
+SUPER_PLAN_ORIGINAL_PRICE_INR = 0  # no struck-through price is shown any more
 
 # Tier names granted on payment, keyed by which plan was purchased.
 NORMAL_TIER_NAME = "normal_monthly"

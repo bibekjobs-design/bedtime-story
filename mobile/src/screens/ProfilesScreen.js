@@ -222,6 +222,17 @@ export default function ProfilesScreen({
   const [samplePlayingId, setSamplePlayingId] = useState(null);
   const sampleAudioRef = useRef(null);
 
+  // Leaving this screen (Home, Library, a story, back...) must silence the
+  // voice sample - otherwise it keeps playing until the clip ends.
+  useEffect(() => {
+    return () => {
+      if (sampleAudioRef.current) {
+        stopSamplePlayer(sampleAudioRef.current);
+        sampleAudioRef.current = null;
+      }
+    };
+  }, []);
+
   function togglePlaySample(clone) {
     if (samplePlayingId === clone.id && sampleAudioRef.current) {
       stopSamplePlayer(sampleAudioRef.current);
@@ -377,7 +388,7 @@ export default function ProfilesScreen({
     user?.subscription_tier
   );
   const isNormal = user?.subscription_tier === "normal_monthly";
-  const isProPlan = user?.subscription_tier === "pro_monthly"; // Rs 161
+  const isProPlan = user?.subscription_tier === "pro_monthly"; // Rs 151
   const isPaid = isPremium || isNormal || isProPlan;
 
   return (
@@ -447,12 +458,12 @@ export default function ProfilesScreen({
                   <Text style={styles.upgradeSubtitle}>
                     {isProPlan ? (
                       <>
-                        STORYLAND Super · <Text style={styles.upgradePrice}>₹321</Text>/month{" "}
+                        Bedtime Story Super · <Text style={styles.upgradePrice}>₹219</Text>/month{" "}
                         <Text style={styles.upgradeStrikePrice}>₹299</Text>
                       </>
                     ) : (
                       <>
-                        STORYLAND Pro · <Text style={styles.upgradePrice}>₹161</Text>/month
+                        Bedtime Story Pro · <Text style={styles.upgradePrice}>₹151</Text>/month
                       </>
                     )}
                   </Text>
@@ -486,7 +497,7 @@ export default function ProfilesScreen({
                     <View style={styles.upgradeBenefitRow}>
                       <Text style={styles.upgradeBenefitIcon}>🎙️</Text>
                       <Text style={styles.upgradeBenefitText}>
-                        Want Mom or Dad's own cloned voice? That's in Super (₹321/month)
+                        Want Mom or Dad's own cloned voice? That's in Super (₹219/month)
                       </Text>
                     </View>
                   </>
@@ -508,10 +519,10 @@ export default function ProfilesScreen({
               <TouchableOpacity style={styles.upgradeCta} onPress={onGoToUpgrade}>
                 <Text style={styles.upgradeCtaText}>
                   {isProPlan
-                    ? "Upgrade to Super — ₹321/month"
+                    ? "Upgrade to Super — ₹219/month"
                     : isNormal
-                    ? "Upgrade to Pro — ₹161/month"
-                    : "View Plans — from ₹111/month"}
+                    ? "Upgrade to Pro — ₹151/month"
+                    : "View Plans — from ₹99/month"}
                 </Text>
               </TouchableOpacity>
               <Text style={styles.upgradeFooterNote}>Cancel anytime. No hidden charges.</Text>
@@ -607,7 +618,7 @@ export default function ProfilesScreen({
             <Text style={styles.emptySubtitle}>
               {isPremium
                 ? "Clone your voice so bedtime stories can be narrated in Mom or Dad's comforting voice."
-                : "Clone your voice so bedtime stories can be narrated in Mom or Dad's comforting voice. This is a Super feature (₹321/month)."}
+                : "Clone your voice so bedtime stories can be narrated in Mom or Dad's comforting voice. This is a Super feature (₹219/month)."}
             </Text>
             <TouchableOpacity
               style={styles.addFirstBtn}

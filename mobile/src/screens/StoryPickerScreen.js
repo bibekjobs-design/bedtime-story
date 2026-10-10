@@ -657,7 +657,8 @@ export default function StoryPickerScreen({
       const res = await api.narrateCloned(
         story.id,
         activeProfile?.id || null,
-        cloneObj.id
+        cloneObj.id,
+        story.language_code || null
       );
 
       loadUsageInfo();

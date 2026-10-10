@@ -4,7 +4,7 @@ Shared pricing & trial policy - single source of truth so subscriptions.py
 actual generation-limit enforcement) can never drift apart.
 
 Pricing model (effective from TRIAL_POLICY_CUTOVER):
-  - New signups get a 15-day free trial (full "free" tier access - see
+  - New signups get a 30-day (1 month) free trial (full "free" tier access - see
     usage_service.TIER_LIMITS["free"]). After it lapses, unpaid users drop
     to TIER_LIMITS["free_expired"] (0 custom stories, 0 clones) but can
     still browse the pre-made Library forever - the Library endpoints
@@ -28,11 +28,11 @@ Pricing model (effective from TRIAL_POLICY_CUTOVER):
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-# Anyone who signed up on/after this date gets the new 15-day trial.
+# Anyone who signed up on/after this date gets the 30-day trial.
 # Anyone who signed up before it keeps the original 30-day trial.
 TRIAL_POLICY_CUTOVER = datetime(2026, 9, 25, tzinfo=timezone.utc)
 
-NEW_TRIAL_DURATION_DAYS = 15
+NEW_TRIAL_DURATION_DAYS = 30
 LEGACY_TRIAL_DURATION_DAYS = 30
 
 # One-time goodwill window (Oct 2026): EVERY account that existed before
@@ -40,7 +40,7 @@ LEGACY_TRIAL_DURATION_DAYS = 30
 # no matter when it signed up. 2026-10-30 18:30 UTC = 2026-10-31 00:00 IST, so
 # the Home screen counts 30 days left on Oct 1, 29 on Oct 2, ... 1 on Oct 30.
 # Accounts created on/after EXISTING_USERS_CUTOVER (Oct 1, 8:00 PM IST) follow
-# the normal rule: NEW_TRIAL_DURATION_DAYS (15) from their own signup date,
+# the normal rule: NEW_TRIAL_DURATION_DAYS (30) from their own signup date,
 # counting down day by day.
 EXISTING_USERS_CUTOVER = datetime(2026, 10, 1, 14, 30, tzinfo=timezone.utc)  # Oct 1, 8:00 PM IST
 EXISTING_USERS_TRIAL_END = datetime(2026, 10, 30, 18, 30, tzinfo=timezone.utc)
@@ -103,7 +103,7 @@ def _parse_dt(value) -> Optional[datetime]:
 
 def get_trial_duration_days(created_at) -> int:
     """Grandfathering rule: accounts created before the cutover keep 30
-    days; accounts created on/after it get the new 15-day trial."""
+    days; accounts created on/after it get the 30-day trial."""
     created_dt = _parse_dt(created_at)
     if created_dt is None:
         # Unknown signup date - be generous, not punitive.

@@ -95,6 +95,24 @@ def _enforce_listen_access(story_text_id: str, current_user: Optional[dict]) -> 
         )
 
 
+def _announce_new_story(title: str) -> None:
+    """Adds a bell notification ("New story: <title>") for every user. Never lets a
+    notification problem break the publish itself."""
+    try:
+        from datetime import datetime, timedelta, timezone
+        get_supabase().table("announcements").insert({
+            "title": "New story in the Library",
+            "message": f"\"{(title or '').strip()}\" is now ready to listen to. Sweet dreams!",
+            "icon": "🌙",
+            "audience": "all",
+            "action": "library",
+            "action_label": "Open Library",
+            "expires_at": (datetime.now(timezone.utc) + timedelta(days=14)).isoformat(),
+        }).execute()
+    except Exception as e:
+        print(f"[announce] could not add new-story notification: {e}")
+
+
 class StoryTeaserResponse(BaseModel):
     id: str
     category_id: Optional[str] = None
@@ -556,7 +574,7 @@ async def publish_manual_story_endpoint(
 
     try:
         clear_feed_cache()
-        return publish_manual_story(
+        published = publish_manual_story(
             title=title,
             full_text=full_text,
             category_id=category_id,
@@ -571,6 +589,8 @@ async def publish_manual_story_endpoint(
             language_code=language_code,
             extra_language_codes=[c.strip() for c in (extra_languages or "").split(",") if c.strip()],
         )
+        _announce_new_story(title)
+        return published
     except ValueError as val_err:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(val_err))
     except Exception as exc:

@@ -449,7 +449,7 @@ export const api = {
     request(`/api/voice-clones/${id}`, {
       method: "DELETE",
     }),
-  narrateCloned: (storyTextId, childProfileId, voiceCloneId) =>
+  narrateCloned: (storyTextId, childProfileId, voiceCloneId, languageCode) =>
     request(
       "/api/voice-clones/narrate",
       {
@@ -458,6 +458,7 @@ export const api = {
           base_story_text_id: storyTextId,
           child_profile_id: childProfileId,
           voice_clone_id: voiceCloneId,
+          language_code: languageCode || null,
         }),
       },
       AI_REQUEST_TIMEOUT_MS

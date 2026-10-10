@@ -53,6 +53,8 @@ export default function CreateScreen({
   const [pdfReadMode, setPdfReadMode] = useState("normal"); // 'normal' | 'range'
   const [pdfPageFrom, setPdfPageFrom] = useState("");
   const [pdfPageTo, setPdfPageTo] = useState("");
+  const [showPdfInfo, setShowPdfInfo] = useState(false);
+  const [showLimitInfo, setShowLimitInfo] = useState(false);
 
   const [voiceSource, setVoiceSource] = useState("narrator"); // 'narrator' | 'clone'
 
@@ -230,7 +232,7 @@ export default function CreateScreen({
       formData.append("age_group_id", String(activeProfile?.age_group_id || 1));
       formData.append("voice_id", String(selectedVoiceId));
       formData.append("accent_id", String(selectedAccentId));
-      formData.append("language_code", String(voiceSource === "clone" ? "en" : languageCode));
+      formData.append("language_code", String(languageCode));
       if (usingPageRange) {
         formData.append("pdf_page_from", String(pageFromNum));
         formData.append("pdf_page_to", String(pageToNum));
@@ -259,7 +261,8 @@ export default function CreateScreen({
         const clonedAudioRes = await api.narrateCloned(
           storyTextId,
           activeProfile?.id,
-          cloneId
+          cloneId,
+          languageCode
         );
 
         data = {
@@ -407,21 +410,41 @@ export default function CreateScreen({
             ) : null}
 
             <View style={styles.limitBox}>
-              <Text style={styles.limitBoxTitle}>📖 Reading a PDF?</Text>
-              <Text style={styles.limitBoxText}>
-                You can read the whole PDF or just one chapter. After you pick a PDF, choose "Page Range" and enter the From and To page (for example pages 3 to 7). The story length limit below still applies to the pages you choose.
-              </Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.limitBoxHeader}
+                onPress={() => setShowPdfInfo((v) => !v)}
+              >
+                <Text style={[styles.limitBoxTitle, { marginBottom: 0 }]}>📖 Reading a PDF?</Text>
+                <Text style={styles.limitBoxArrow}>{showPdfInfo ? "▴" : "▾"}</Text>
+              </TouchableOpacity>
+              {showPdfInfo ? (
+                <Text style={[styles.limitBoxText, { marginTop: 6 }]}>
+                  You can read the whole PDF or just one chapter. After you pick a PDF, choose "Page Range" and enter the From and To page (for example pages 3 to 7). The story length limit below still applies to the pages you choose.
+                </Text>
+              ) : null}
             </View>
 
             <View style={styles.limitBox}>
-              <Text style={styles.limitBoxTitle}>⏱ Story length limit</Text>
-              <Text style={styles.limitBoxText}>
-                {voiceSource === "clone" ? cloneLengthText : narratorLengthText}
-              </Text>
-              {voiceSource === "clone" ? (
-                <Text style={[styles.limitBoxText, { marginTop: 8, color: "#ffd479" }]}>
-                  ⏳ Stories made in your voice are deleted automatically 10 days after they are created. Open History and tap ⬇️ on the story to save it to your device before then.
-                </Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.limitBoxHeader}
+                onPress={() => setShowLimitInfo((v) => !v)}
+              >
+                <Text style={[styles.limitBoxTitle, { marginBottom: 0 }]}>⏱ Story length limit</Text>
+                <Text style={styles.limitBoxArrow}>{showLimitInfo ? "▴" : "▾"}</Text>
+              </TouchableOpacity>
+              {showLimitInfo ? (
+                <>
+                  <Text style={[styles.limitBoxText, { marginTop: 6 }]}>
+                    {voiceSource === "clone" ? cloneLengthText : narratorLengthText}
+                  </Text>
+                  {voiceSource === "clone" ? (
+                    <Text style={[styles.limitBoxText, { marginTop: 8, color: "#ffd479" }]}>
+                      ⏳ Stories made in your voice are deleted automatically 10 days after they are created. Open History and tap ⬇️ on the story to save it to your device before then.
+                    </Text>
+                  ) : null}
+                </>
               ) : null}
             </View>
           </View>
@@ -450,6 +473,17 @@ export default function CreateScreen({
               </View>
             </View>
 
+            {voiceSource === "clone" && (
+              <>
+                <Text style={styles.accentLabel}>Story language</Text>
+                <LanguagePicker value={languageCode} onChange={setLanguageCode} style={{ marginBottom: 14 }} />
+                {languageCode !== "en" && (
+                  <Text style={styles.hintText}>
+                    Any file is translated into {langInfo.label} first, then read in your voice.
+                  </Text>
+                )}
+              </>
+            )}
             {voiceSource === "narrator" ? (
               <>
                 <Text style={styles.accentLabel}>Story language</Text>
@@ -646,6 +680,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
   },
+  limitBoxHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  limitBoxArrow: { color: GOLD, fontSize: 16, fontWeight: "900" },
   limitBoxTitle: { color: GOLD, fontSize: 12.5, fontWeight: "800", marginBottom: 4 },
   limitBoxText: { color: "#fff", fontSize: 12.5, lineHeight: 18, fontWeight: "600" },
   voiceHeaderRow: {

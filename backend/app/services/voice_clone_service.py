@@ -1,3 +1,4 @@
+import re
 import io
 import uuid
 import httpx
@@ -25,6 +26,42 @@ CLONED_STORY_RETENTION_DAYS = 10
 # whole app, change ONLY this line. Do not add a per-tier or per-user override
 # and do not add a fallback to a pricier model.
 ELEVENLABS_TTS_MODEL_ID = "eleven_flash_v2_5"
+
+# Flash v2.5 speaks English and Hindi but NOT Bengali / Kannada / Telugu.
+# Those three use Eleven v3 (the only ElevenLabs model that covers them).
+# v3 costs more per character, so it is used ONLY for those languages.
+ELEVENLABS_V3_MODEL_ID = "eleven_v3"
+ELEVENLABS_V3_LANGS = {"bn", "kn", "te"}
+CLONE_LANGS = {"en", "hi", "bn", "kn", "te"}
+
+
+def _resolve_clone_text(supabase, base: dict, language_code):
+    """
+    Returns (code, text) for the language the parent wants to hear the story in.
+    Uses the story's own text when it is already in that language, then an
+    admin-added translation, and only then translates with Gemini.
+    """
+    from app.services import story_service as ss
+    code = (language_code or "").strip().lower().split("-")[0]
+    base_text = base.get("full_text") or base.get("teaser", "")
+    code_map = ss._language_code_map(supabase)
+    native = code_map.get(base.get("language_id")) or "en"
+    if code not in CLONE_LANGS:
+        return native, base_text
+    if code == native:
+        return code, base_text
+    lang_id = next((lid for lid, c in code_map.items() if c == code), None)
+    if lang_id is not None:
+        try:
+            r = (supabase.table("story_translations").select("full_text")
+                 .eq("story_text_id", base["id"]).eq("language_id", lang_id).limit(1).execute())
+            if r.data and r.data[0].get("full_text"):
+                return code, r.data[0]["full_text"]
+        except Exception as e:
+            print(f"[clone lang] translation lookup skipped: {e}")
+    labels = {"en": "English", "hi": "Hindi", "bn": "Bengali", "kn": "Kannada", "te": "Telugu"}
+    text, _ = ss.ensure_text_in_language(base_text, code, labels[code])
+    return code, text
 
 # --- PRODUCTION LIMIT: per-narration character cap for cloned-voice stories ---
 # This is a permanent product limit (not a testing guardrail): Pro plan
@@ -130,7 +167,8 @@ async def narrate_story_with_voice_clone(
     base_story_text_id: str,
     voice_clone_id: str,
     child_profile_id: Optional[str] = None,
-    admin_test: bool = False
+    admin_test: bool = False,
+    language_code: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Narrates a story in the parent's cloned voice:
@@ -156,17 +194,25 @@ async def narrate_story_with_voice_clone(
     # Check cache at PARENT level — keyed by story + voice_clone_id only.
     # voice_clone_id already uniquely identifies the parent (no cross-parent leakage),
     # so the same cached audio is reused when the parent switches between children.
-    cached = (
+    cached_all = (
         supabase.table("personalized_stories")
         .select("*")
         .eq("base_story_text_id", base_story_text_id)
         .eq("voice_clone_id", voice_clone_id)
-        .limit(1)
         .execute()
     )
     base = supabase.table("story_texts").select("*").eq("id", base_story_text_id).single().execute().data or {}
     base_title = base.get("title", "Bedtime Tale")
-    full_text = base.get("full_text") or base.get("teaser", "")
+    lang, full_text = _resolve_clone_text(supabase, base, language_code)
+    # Each language has its own audio file (…_<lang>.mp3); older rows without a
+    # suffix are the story's original language.
+    from app.services import story_service as _ss
+    native_lang = _ss._language_code_map(supabase).get(base.get("language_id")) or "en"
+    def _row_lang(r):
+        u = (r.get("audio_url") or "").split("?")[0]
+        m = re.search(r"_([a-z]{2})\.mp3$", u)
+        return m.group(1) if m else native_lang
+    cached = type("R", (), {"data": [r for r in (cached_all.data or []) if _row_lang(r) == lang][:1]})()
 
     # Production limit: cap the narrated text at CLONED_VOICE_CHAR_LIMIT
     # characters regardless of the source story's real length. The admin
@@ -295,20 +341,26 @@ async def narrate_story_with_voice_clone(
             ELEVENLABS_DAD_VOICE_ID if voice_gender == "male" else ELEVENLABS_MOM_VOICE_ID
         )
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                res = await client.post(
-                    f"{ELEVENLABS_API_URL}/text-to-speech/{tts_voice_id}",
-                    headers={"xi-api-key": settings.ELEVENLABS_API_KEY, "Content-Type": "application/json"},
-                    json={
-                        "text": full_text[:4800],
-                        # Cheapest model, app-wide - see ELEVENLABS_TTS_MODEL_ID above.
-                        "model_id": ELEVENLABS_TTS_MODEL_ID,
-                        "voice_settings": {
-                            "stability": 0.65,
-                            "similarity_boost": 0.80
-                        }
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                tts_model = ELEVENLABS_V3_MODEL_ID if lang in ELEVENLABS_V3_LANGS else ELEVENLABS_TTS_MODEL_ID
+                tts_body = {
+                    "text": full_text[:4800],
+                    "model_id": tts_model,
+                    "voice_settings": {
+                        "stability": 0.5 if tts_model == ELEVENLABS_V3_MODEL_ID else 0.65,
+                        "similarity_boost": 0.80
                     }
-                )
+                }
+                if lang != "en":
+                    tts_body["language_code"] = lang
+                tts_url = f"{ELEVENLABS_API_URL}/text-to-speech/{tts_voice_id}"
+                tts_headers = {"xi-api-key": settings.ELEVENLABS_API_KEY, "Content-Type": "application/json"}
+                res = await client.post(tts_url, headers=tts_headers, json=tts_body)
+                if res.status_code in (400, 422) and "language_code" in tts_body:
+                    # Model rejected the explicit language: let it auto-detect.
+                    print(f"[ElevenLabs TTS] language_code rejected ({res.text[:200]}); retrying auto-detect")
+                    tts_body.pop("language_code")
+                    res = await client.post(tts_url, headers=tts_headers, json=tts_body)
                 if res.status_code == 200:
                     audio_bytes = res.content
                     is_real_clone = not tts_voice_id.startswith("simulated_") and tts_voice_id not in [ELEVENLABS_DAD_VOICE_ID, ELEVENLABS_MOM_VOICE_ID]
@@ -324,14 +376,15 @@ async def narrate_story_with_voice_clone(
         # "luna"), not a raw gender string - map the clone's inferred gender
         # to the closest-matching narrator voice.
         fallback_voice_id = "oliver" if voice_gender == "male" else "luna"
-        audio_bytes, duration_seconds = synthesize_story_audio(full_text, "en", voice_id=fallback_voice_id)
+        audio_bytes, duration_seconds = synthesize_story_audio(full_text, lang, voice_id=fallback_voice_id)
     else:
         # Approximate duration
         duration_seconds = max(60, int(len(full_text.split()) / 2.2))
 
     # Save to Supabase Storage
     sub_folder = child_profile_id or f"parent_{user_id}"
-    storage_path = f"personalized/{sub_folder}/cloned_{base_story_text_id}_{voice_clone_id}.mp3"
+    lang_suffix = "" if lang == native_lang else f"_{lang}"
+    storage_path = f"personalized/{sub_folder}/cloned_{base_story_text_id}_{voice_clone_id}{lang_suffix}.mp3"
     supabase.storage.from_("story-audio").upload(
         path=storage_path,
         file=audio_bytes,
@@ -422,34 +475,7 @@ def delete_clone_everywhere(supabase, clone: dict) -> None:
             supabase.storage.from_("story-audio").remove([f"{folder}/{n}" for n in names])
     except Exception as e:
         print(f"[voice clone] sample cleanup failed: {e}")
-    # Stories made in this voice (and their History entries) must go first, or the
-    # database refuses to delete the voice and it "comes back" on the next refresh.
-    cid = clone["id"]
-    try:
-        stories = supabase.table("personalized_stories").select("id, audio_url").eq("voice_clone_id", cid).execute().data or []
-        for st in stories:
-            url = st.get("audio_url") or ""
-            if "/story-audio/" in url:
-                try:
-                    supabase.storage.from_("story-audio").remove([url.split("/story-audio/", 1)[1].split("?", 1)[0]])
-                except Exception as e:
-                    print(f"[voice clone] cloned story audio cleanup failed: {e}")
-            if url:
-                try:
-                    supabase.table("story_events").delete().eq("audio_url", url).execute()
-                except Exception:
-                    pass
-        supabase.table("personalized_stories").delete().eq("voice_clone_id", cid).execute()
-    except Exception as e:
-        print(f"[voice clone] cloned stories cleanup failed: {e}")
-    try:
-        supabase.table("story_events").delete().eq("voice_clone_id", cid).execute()
-    except Exception as e:
-        print(f"[voice clone] history cleanup failed: {e}")
-    supabase.table("voice_clones").delete().eq("id", cid).execute()
-    left = supabase.table("voice_clones").select("id").eq("id", cid).execute().data
-    if left:
-        raise RuntimeError("Voice could not be removed from the database.")
+    supabase.table("voice_clones").delete().eq("id", clone["id"]).execute()
 
 
 def purge_expired_cloned_stories() -> int:

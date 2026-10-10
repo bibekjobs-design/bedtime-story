@@ -18,6 +18,7 @@ class NarrateClonedRequest(BaseModel):
     base_story_text_id: str
     voice_clone_id: str
     child_profile_id: Optional[str] = None
+    language_code: Optional[str] = None
 
 
 @router.get("/")
@@ -65,7 +66,7 @@ async def upload_voice_clone(
     Uploads parent voice sample (MP3/WAV/M4A), stores in Supabase Storage,
     and registers with ElevenLabs voice cloning provider.
     Registering a clone is a real per-clone cost with ElevenLabs, so this is
-    strictly a Premium feature (₹321/month) - free users can see the option
+    strictly a Premium feature (₹219/month) - free users can see the option
     but are asked to subscribe before we actually create the clone.
     """
     tier = current_user.get("subscription_tier", "free")
@@ -75,7 +76,7 @@ async def upload_voice_clone(
     if not is_admin and tier not in ("premium", "premium_monthly", "premium_annual"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Voice cloning is a Super feature. Upgrade to the ₹321/month Super plan to clone your voice for bedtime stories!"
+            detail="Voice cloning is a Super feature. Upgrade to the ₹219/month Super plan to clone your voice for bedtime stories!"
         )
 
     if (consent or "").strip().lower() != "true":
@@ -114,7 +115,7 @@ async def narrate_cloned(
     """
     Generates bedtime narration using the parent's cloned voice,
     caching the result privately in personalized_stories.
-    Strictly restricted to Premium subscribers (₹321/month).
+    Strictly restricted to Premium subscribers (₹219/month).
     """
     tier = current_user.get("subscription_tier", "free")
     email = (current_user.get("email") or "").lower().strip()
@@ -126,7 +127,7 @@ async def narrate_cloned(
     if not is_admin and tier not in ("premium", "premium_monthly", "premium_annual"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Parent voice clone narration is a Super feature. Upgrade to the ₹321/month Super plan to narrate stories in your voice!"
+            detail="Parent voice clone narration is a Super feature. Upgrade to the ₹219/month Super plan to narrate stories in your voice!"
         )
 
     try:
@@ -136,7 +137,8 @@ async def narrate_cloned(
             child_profile_id=payload.child_profile_id,
             base_story_text_id=payload.base_story_text_id,
             voice_clone_id=payload.voice_clone_id,
-            admin_test=is_admin
+            admin_test=is_admin,
+            language_code=payload.language_code
         )
         return res
     except ValueError as ve:

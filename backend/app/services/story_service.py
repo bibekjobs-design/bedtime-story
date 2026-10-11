@@ -270,11 +270,11 @@ def derive_title_from_text(text: str, max_words: int = 8) -> str:
     text = sanitize_text(text)
     words = (text or "").strip().split()
     if not words:
-        return "My Bedtime Story"
+        return "My Story"
     snippet = " ".join(words[:max_words])
     if len(words) > max_words:
         snippet += "..."
-    return snippet[0].upper() + snippet[1:] if snippet else "My Bedtime Story"
+    return snippet[0].upper() + snippet[1:] if snippet else "My Story"
 
 
 def derive_teaser_from_text(text: str, max_words: int = 20) -> str:
@@ -1212,7 +1212,12 @@ def _voice_and_accent_for_story(supabase, story_text_id: str) -> tuple:
         .execute()
     )
     if audio_res.data:
-        provider = (audio_res.data[0].get("provider") or "")
+        # Prefer the story's own narrator over a default Luna/US copy, so a
+        # stray default copy can never decide which voice the story "has".
+        rows = [r for r in audio_res.data if (r.get("provider") or "").startswith("google_tts:")]
+        non_default = [r for r in rows if r.get("provider") not in ("google_tts:luna:us", "google_tts:luna")]
+        chosen = (non_default or rows or audio_res.data)[0]
+        provider = (chosen.get("provider") or "")
         parts = provider.split(":")
         if len(parts) >= 2 and parts[0] == "google_tts":
             voice_id = parts[1] or voice_id
@@ -1926,6 +1931,54 @@ def commit_and_narrate_story(
                     "ambient_sound": ambient_sound,
                     "cached": True
                 }
+
+    # The app asks for the default narrator (luna / US accent) whenever a story
+    # is reopened from the Library or History - it never offers a narrator
+    # picker there. If the story already has audio in its own narrator (the one
+    # chosen when it was created or published), play THAT instead of silently
+    # making a second Luna copy.
+    if not force_resynthesize and voice_tier == "standard" and voice_id == "luna" and accent_id == "us":
+        try:
+            own = (
+                supabase.table("story_audio")
+                .select("*")
+                .eq("story_text_id", story_text_id)
+                .like("voice_tier", "standard%")
+                .execute().data or []
+            )
+            own = [
+                r for r in own
+                if re.fullmatch(r"standard(_[a-z]+_[a-z]+)?", r.get("voice_tier") or "")
+                and (r.get("audio_url") or "")
+            ]
+            if own:
+                r = own[0]
+                supabase.table("story_texts").update({
+                    "times_served": (story.get("times_served") or 0) + 1
+                }).eq("id", story_text_id).execute()
+                record_story_event(
+                    user_id=user_id,
+                    origin="library",
+                    story_text_id=story_text_id,
+                    title=story.get("title"),
+                    voice_id=voice_id,
+                    audio_url=r["audio_url"],
+                    duration_seconds=r["duration_seconds"],
+                )
+                return {
+                    "story_text_id": story_text_id,
+                    "title": story["title"],
+                    "teaser": story["teaser"],
+                    "full_text": story["full_text"],
+                    "audio_url": r["audio_url"],
+                    "duration_seconds": r["duration_seconds"],
+                    "voice_tier": voice_tier,
+                    "provider": r["provider"],
+                    "ambient_sound": ambient_sound,
+                    "cached": True
+                }
+        except Exception as e:
+            print(f"[commit] own-narrator lookup skipped: {e}")
 
     full_text = story.get("full_text")
     if not full_text:

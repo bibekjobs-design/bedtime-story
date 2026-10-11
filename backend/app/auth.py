@@ -112,8 +112,20 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depen
         try:
             expires_dt = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
             if datetime.now(timezone.utc) > expires_dt:
-                supabase.table("users").update({"subscription_tier": "free"}).eq("id", user["id"]).execute()
+                old_tier = user.get("subscription_tier")
+                moved = (
+                    supabase.table("users").update({"subscription_tier": "free"})
+                    .eq("id", user["id"]).eq("subscription_tier", old_tier).execute()
+                )
                 user["subscription_tier"] = "free"
+                # Only the request that really moved the user sends the
+                # "plan ended" email, so it goes out once.
+                if moved.data and user.get("email"):
+                    try:
+                        from app.services.email_service import notify_plan_ended
+                        notify_plan_ended(user["email"], user.get("full_name") or "")
+                    except Exception as e:
+                        print(f"[auth] plan-ended email skipped: {e}")
         except (ValueError, TypeError):
             pass
 

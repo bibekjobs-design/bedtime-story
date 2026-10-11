@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  TextInput,
 } from "react-native";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
@@ -76,9 +77,65 @@ export default function AdminDashboardScreen({ onGoToHome }) {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [generatingCategoryId, setGeneratingCategoryId] = useState(null);
 
+  // Messages users sent through "Contact us"
+  const [supportMsgs, setSupportMsgs] = useState([]);
+  async function loadSupportMsgs() {
+    try {
+      setSupportMsgs(await api.getSupportMessages());
+    } catch (e) {
+      // the dashboard still works without the inbox
+    }
+  }
+  function replyTo(m) {
+    setNoticeToOne(true);
+    setNoticeEmail(m.user_email || "");
+    setNoticeText("");
+    setNoticeStatus({ ok: true, text: `Reply box is addressed to ${m.user_name || m.user_email}. Write your answer and press Send.` });
+    if (!m.is_read) {
+      api.markSupportMessageRead(m.id).catch(() => {});
+      setSupportMsgs((prev) => prev.map((x) => (x.id === m.id ? { ...x, is_read: true } : x)));
+    }
+  }
+
+  // Notification to all users (shown behind the bell)
+  const [noticeText, setNoticeText] = useState("");
+  const [noticeSending, setNoticeSending] = useState(false);
+  const [noticeToOne, setNoticeToOne] = useState(false);
+  const [noticeEmail, setNoticeEmail] = useState("");
+  const [noticeStatus, setNoticeStatus] = useState(null); // { ok, text }
+
+  async function publishNotice() {
+    const text = noticeText.trim();
+    if (!text) {
+      setNoticeStatus({ ok: false, text: "Write a message first." });
+      return;
+    }
+    if (noticeToOne && !noticeEmail.trim()) {
+      setNoticeStatus({ ok: false, text: "Enter the user's email address." });
+      return;
+    }
+    setNoticeSending(true);
+    setNoticeStatus(null);
+    try {
+      const res = await api.publishAnnouncement(text, null, noticeToOne ? noticeEmail.trim() : null);
+      setNoticeText("");
+      setNoticeStatus({
+        ok: true,
+        text: noticeToOne
+          ? `Sent privately to ${res?.sent_to || noticeEmail.trim()} - they will see it in their bell.`
+          : "Published - all users will see it in their bell shortly.",
+      });
+    } catch (e) {
+      setNoticeStatus({ ok: false, text: e.message || "Could not publish." });
+    } finally {
+      setNoticeSending(false);
+    }
+  }
+
   useEffect(() => {
     load();
     loadMonthlyReport();
+    loadSupportMsgs();
   }, []);
 
   async function loadCategories() {
@@ -168,6 +225,82 @@ export default function AdminDashboardScreen({ onGoToHome }) {
             <TouchableOpacity style={styles.refreshBtn} onPress={load}>
               <Text style={styles.refreshBtnText}>🔄 Refresh</Text>
             </TouchableOpacity>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                📥 User Messages{supportMsgs.filter((m) => !m.is_read).length > 0 ? ` (${supportMsgs.filter((m) => !m.is_read).length} new)` : ""}
+              </Text>
+              {supportMsgs.length === 0 ? (
+                <Text style={{ color: "#8b8fa3", fontSize: 13 }}>No messages yet.</Text>
+              ) : (
+                supportMsgs.slice(0, 10).map((m) => (
+                  <View key={m.id} style={styles.msgCard}>
+                    <Text style={styles.msgHead}>
+                      {m.is_read ? "" : "🟠 "}{m.user_name || "User"} · {m.user_email} · {m.plan}
+                    </Text>
+                    <Text style={styles.msgDate}>{new Date(m.created_at).toLocaleString()}</Text>
+                    <Text style={styles.msgBody}>{m.message}</Text>
+                    <TouchableOpacity style={styles.msgReplyBtn} onPress={() => replyTo(m)}>
+                      <Text style={styles.msgReplyText}>Reply</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>📢 Send a Notification</Text>
+              <View style={{ flexDirection: "row", marginBottom: 10 }}>
+                <TouchableOpacity
+                  style={[styles.noticeTab, !noticeToOne && styles.noticeTabActive]}
+                  onPress={() => setNoticeToOne(false)}
+                >
+                  <Text style={[styles.noticeTabText, !noticeToOne && styles.noticeTabTextActive]}>Everyone</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.noticeTab, noticeToOne && styles.noticeTabActive]}
+                  onPress={() => setNoticeToOne(true)}
+                >
+                  <Text style={[styles.noticeTabText, noticeToOne && styles.noticeTabTextActive]}>One user</Text>
+                </TouchableOpacity>
+              </View>
+              {noticeToOne && (
+                <TextInput
+                  style={[styles.noticeInput, { minHeight: 0, marginBottom: 10 }]}
+                  value={noticeEmail}
+                  onChangeText={setNoticeEmail}
+                  placeholder="User's email address"
+                  placeholderTextColor="#8b8fa3"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              )}
+              <TextInput
+                style={styles.noticeInput}
+                value={noticeText}
+                onChangeText={setNoticeText}
+                placeholder={noticeToOne ? "Write a private message for this user..." : "Write a message for every user's bell..."}
+                placeholderTextColor="#8b8fa3"
+                multiline
+                maxLength={400}
+              />
+              <TouchableOpacity
+                style={[styles.noticeBtn, (noticeSending || !noticeText.trim()) && { opacity: 0.5 }]}
+                onPress={publishNotice}
+                disabled={noticeSending || !noticeText.trim()}
+              >
+                {noticeSending ? (
+                  <ActivityIndicator color="#101119" />
+                ) : (
+                  <Text style={styles.noticeBtnText}>{noticeToOne ? "Send to this user" : "Publish to all users"}</Text>
+                )}
+              </TouchableOpacity>
+              {noticeStatus && (
+                <Text style={{ color: noticeStatus.ok ? "#4ade80" : "#f87171", marginTop: 8, fontSize: 13 }}>
+                  {noticeStatus.text}
+                </Text>
+              )}
+            </View>
 
             {data.capacity_forecast && (
               <View style={styles.section}>
@@ -523,6 +656,49 @@ export default function AdminDashboardScreen({ onGoToHome }) {
 }
 
 const styles = StyleSheet.create({
+  noticeInput: {
+    minHeight: 80,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 12,
+    padding: 12,
+    color: "#ffffff",
+    fontSize: 14,
+    textAlignVertical: "top",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  noticeBtn: {
+    marginTop: 10,
+    backgroundColor: "#f5a623",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  msgCard: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  msgHead: { color: "#ffffff", fontWeight: "700", fontSize: 13 },
+  msgDate: { color: "#8b8fa3", fontSize: 11, marginTop: 2 },
+  msgBody: { color: "#e5e7ee", fontSize: 14, marginTop: 8, lineHeight: 20 },
+  msgReplyBtn: { alignSelf: "flex-start", marginTop: 10, backgroundColor: "#f5a623", borderRadius: 10, paddingVertical: 6, paddingHorizontal: 16 },
+  msgReplyText: { color: "#101119", fontWeight: "700", fontSize: 13 },
+  noticeTab: {
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    marginRight: 8,
+  },
+  noticeTabActive: { backgroundColor: "#f5a623", borderColor: "#f5a623" },
+  noticeTabText: { color: "#ffffff", fontSize: 13, fontWeight: "600" },
+  noticeTabTextActive: { color: "#101119" },
+  noticeBtnText: { color: "#101119", fontWeight: "700", fontSize: 15 },
   container: {
     flex: 1,
     backgroundColor: "transparent",

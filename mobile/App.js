@@ -61,6 +61,10 @@ export default function App() {
   const [deleteOpen, setDeleteOpen] = useState(false); // Delete-account confirmation
   const [deletePw, setDeletePw] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false); // "Contact us" box
+  const [contactText, setContactText] = useState("");
+  const [contactBusy, setContactBusy] = useState(false);
+  const [contactMsg, setContactMsg] = useState(null); // { ok, text }
   const [deleteErr, setDeleteErr] = useState("");
   const [menuOpen, setMenuOpen] = useState(false); // header ☰ menu
   const [notifSignal, setNotifSignal] = useState(0); // bumps to open the notification sheet
@@ -183,6 +187,25 @@ export default function App() {
     else Linking.openURL(url).catch(() => {});
   }
 
+  async function handleSendContact() {
+    const text = contactText.trim();
+    if (!text) {
+      setContactMsg({ ok: false, text: "Please write your message first." });
+      return;
+    }
+    setContactBusy(true);
+    setContactMsg(null);
+    try {
+      await api.sendSupportMessage(text);
+      setContactText("");
+      setContactMsg({ ok: true, text: "Thank you! Your message has been sent. We will get back to you soon." });
+    } catch (e) {
+      setContactMsg({ ok: false, text: e.message || "Could not send your message. Please try again." });
+    } finally {
+      setContactBusy(false);
+    }
+  }
+
   async function handleDeleteAccount() {
     setDeleteBusy(true);
     setDeleteErr("");
@@ -266,6 +289,42 @@ export default function App() {
           </View>
         </View>
       )}
+
+      {/* Contact us: a message to the STORYLAND team */}
+      <Modal visible={contactOpen} transparent animationType="fade" onRequestClose={() => setContactOpen(false)}>
+        <View style={styles.delScrim}>
+          <View style={styles.delCard}>
+            <Text style={styles.delTitle}>Contact us</Text>
+            <Text style={styles.delText}>
+              Have a question, a request or a problem? Write to us here. We will reply in your notifications (the bell).
+            </Text>
+            <TextInput
+              style={[styles.delInput, { minHeight: 110, textAlignVertical: "top" }]}
+              placeholder="Write your message..."
+              placeholderTextColor="#6b6e80"
+              value={contactText}
+              onChangeText={setContactText}
+              multiline
+              maxLength={1000}
+            />
+            {contactMsg ? (
+              <Text style={[styles.delErr, contactMsg.ok && { color: "#4ade80" }]}>{contactMsg.text}</Text>
+            ) : null}
+            <View style={styles.delRow}>
+              <TouchableOpacity style={styles.delBtnGhost} onPress={() => setContactOpen(false)} disabled={contactBusy}>
+                <Text style={styles.delBtnText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.contactSendBtn, (!contactText.trim() || contactBusy) && { opacity: 0.5 }]}
+                disabled={!contactText.trim() || contactBusy}
+                onPress={handleSendContact}
+              >
+                <Text style={[styles.delBtnText, { color: "#101119" }]}>{contactBusy ? "Sending..." : "Send"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Delete account: asks for the password, then removes everything */}
       <Modal visible={deleteOpen} transparent animationType="fade" onRequestClose={() => setDeleteOpen(false)}>
@@ -351,6 +410,18 @@ export default function App() {
                   <Text style={styles.menuItemText}>📄 Terms & Refunds</Text>
                 </TouchableOpacity>
               </>
+            ) : null}
+            {currentUser ? (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuOpen(false);
+                  setContactMsg(null);
+                  setTimeout(() => setContactOpen(true), 250);
+                }}
+              >
+                <Text style={styles.menuItemText}>✉️ Contact us</Text>
+              </TouchableOpacity>
             ) : null}
             {currentUser ? (
               <TouchableOpacity
@@ -653,6 +724,7 @@ const styles = StyleSheet.create({
   delRow: { flexDirection: "row", gap: 10, marginTop: 16 },
   delBtnGhost: { flex: 1, backgroundColor: "#232430", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
   delBtnDanger: { flex: 1, backgroundColor: "#7f1d1d", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+  contactSendBtn: { flex: 1, backgroundColor: "#f5a623", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
   delBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
   menuBtn: {
     width: 38,

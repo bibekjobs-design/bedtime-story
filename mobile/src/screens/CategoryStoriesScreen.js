@@ -15,6 +15,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { api } from "../api/client";
 import StoryLoadingOverlay from "../components/StoryLoadingOverlay";
+import LanguagePicker, { languageByCode, openStoryInView } from "../components/LanguagePicker";
 
 // Shows every story that lives inside one category - reached by tapping a
 // category tile on the Library screen. Reuses the same /precreated endpoint
@@ -52,6 +53,8 @@ export default function CategoryStoriesScreen({
   currentUser,
   onPlayStory,
   onBack,
+  browseLanguage = "en",
+  onBrowseLanguageChange,
   onGoToUpgrade,
 }) {
   const isAdmin = !!currentUser?.is_admin;
@@ -81,14 +84,23 @@ export default function CategoryStoriesScreen({
   useEffect(() => {
     loadStories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category?.id, activeProfile]);
+  }, [category?.id, activeProfile, browseLanguage]);
 
   async function loadStories() {
     if (!category?.id) return;
     setLoading(true);
     try {
       const ageId = activeProfile?.age_group_id || 1;
-      const data = await api.getPrecreatedStories(category.id, ageId, 1, "newest");
+      let data = null;
+      try {
+        // Same whole-library feed as Home, so a category never looks empty
+        // just because of the child's age group.
+        const feed = await api.getHomeFeed(ageId, "newest", browseLanguage);
+        const row = (feed.rows || []).find((r) => String(r.category?.id) === String(category.id));
+        data = row ? row.stories : [];
+      } catch (feedErr) {
+        data = await api.getPrecreatedStories(category.id, ageId, 1, "newest", browseLanguage);
+      }
       setStories(data || []);
     } catch (e) {
       console.warn("Failed to load category stories", e);
@@ -103,14 +115,9 @@ export default function CategoryStoriesScreen({
       if (onGoToUpgrade) onGoToUpgrade();
       return;
     }
-    if (story.has_audio && story.audio_url && story.full_text) {
-      onPlayStory({ ...story, origin: "library" });
-      return;
-    }
     setNarratingId(story.id);
     try {
-      const committed = await api.commitStory(story.id, "standard", "luna");
-      onPlayStory({ ...story, ...committed, origin: "library" });
+      onPlayStory(await openStoryInView(api, story));
     } catch (e) {
       if (String(e.message || "").startsWith("UPGRADE_REQUIRED")) {
         if (onGoToUpgrade) onGoToUpgrade();
@@ -285,11 +292,21 @@ export default function CategoryStoriesScreen({
         <View style={{ width: 40 }} />
       </View>
 
+      {onBrowseLanguageChange && (
+        <View style={{ marginHorizontal: 16, marginBottom: 8, zIndex: 20 }}>
+          <LanguagePicker value={browseLanguage} onChange={onBrowseLanguageChange} />
+        </View>
+      )}
+
       <ScrollView contentContainerStyle={styles.listContent}>
         {loading ? (
           <ActivityIndicator size="large" color="#f5a623" style={{ marginTop: 50 }} />
         ) : stories.length === 0 ? (
-          <Text style={styles.emptyText}>No stories in this category yet.</Text>
+          <Text style={styles.emptyText}>
+            {browseLanguage !== "en"
+              ? `No ${languageByCode(browseLanguage).label} stories in this category yet.`
+              : "No stories in this category yet."}
+          </Text>
         ) : (
           stories.map((story) => (
             <TouchableOpacity

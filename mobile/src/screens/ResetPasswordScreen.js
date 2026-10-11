@@ -62,7 +62,7 @@ export default function ResetPasswordScreen({ initialToken = "", onResetSuccess,
         <Text style={styles.badge}>Account Security</Text>
         <Text style={styles.title}>Set New Password 🔑</Text>
         <Text style={styles.subtitle}>
-          Create a strong password for your Bedtime Story account.
+          Create a strong password for your STORYLAND account.
         </Text>
       </View>
 

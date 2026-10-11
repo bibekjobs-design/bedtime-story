@@ -167,7 +167,7 @@ def _send_threshold_alert(period: str, used: int, limit: int, percent: float, la
         from app.services.email_service import send_admin_alert_email
         per_char_inr = (GOOGLE_TTS_COST_PER_MILLION_CHARS_USD * USD_TO_INR) / 1_000_000
         send_admin_alert_email(
-            subject=f"Bedtime Story - Google TTS free quota {label} - {period}",
+            subject=f"STORYLAND - Google TTS free quota {label} - {period}",
             body=(
                 f"Google Cloud TTS usage for {period}:\n\n"
                 f"  {used:,} / {limit:,} characters used ({percent:.1f}% of the shared free monthly quota)\n\n"

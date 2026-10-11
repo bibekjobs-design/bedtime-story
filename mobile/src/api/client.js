@@ -131,6 +131,15 @@ export const api = {
 
   // In-app announcements (the Home screen bell) - public, plan-aware
   getAnnouncements: () => request("/api/announcements"),
+  sendSupportMessage: (message) =>
+    request("/api/support/messages", { method: "POST", body: JSON.stringify({ message }) }),
+  getSupportMessages: () => request("/api/support/messages"),
+  markSupportMessageRead: (id) => request(`/api/support/messages/${id}/read`, { method: "POST" }),
+  publishAnnouncement: (message, title, userEmail) =>
+    request("/api/announcements", {
+      method: "POST",
+      body: JSON.stringify({ message, title: title || null, user_email: userEmail || null }),
+    }),
   getNarratorVoices: () => request("/api/lookups/narrator-voices"),
   getVoicePreview: (voiceId, accentId = "us") =>
     request(`/api/lookups/narrator-voices/${voiceId}/preview?accent_id=${accentId}`),

@@ -4,7 +4,7 @@ from app.config import settings
 from app.db import get_supabase
 
 app = FastAPI(
-    title="Bedtime Story API",
+    title="STORYLAND API",
     description="Backend API for AI-powered podcast-style Bedtime Stories for kids.",
     version="1.0.0"
 )
@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.routers import lookups, stories, auth, profiles, voice_clones, subscriptions, admin, history, announcements, privacy
+from app.routers import lookups, stories, auth, profiles, voice_clones, subscriptions, admin, history, announcements, privacy, support
 app.include_router(lookups.router)
 app.include_router(stories.router)
 app.include_router(auth.router)
@@ -30,6 +30,7 @@ app.include_router(admin.router)
 app.include_router(history.router)
 app.include_router(announcements.router)
 app.include_router(privacy.router)
+app.include_router(support.router)
 
 
 @app.on_event("startup")
@@ -119,7 +120,7 @@ def start_supabase_keepalive():
 @app.get("/")
 def read_root():
     return {
-        "service": "Bedtime Story API",
+        "service": "STORYLAND API",
         "status": "online",
         "version": "1.0.0"
     }

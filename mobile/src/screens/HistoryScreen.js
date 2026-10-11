@@ -314,7 +314,7 @@ export default function HistoryScreen({ step, onPlayStory, onGoToHome }) {
                       {items.map((item, idx) => (
                         <HistoryCard
                           key={item.id || `${item.story_text_id || idx}-${idx}`}
-                          title={item.title || "Bedtime Story"}
+                          title={item.title || "Story"}
                           cover={item.cover_image_url}
                           emoji={cat.key === "cloned" ? "🎙️" : undefined}
                           tag={cat.key === "cloned" ? "🎙️ Parent" : null}

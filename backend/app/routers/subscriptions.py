@@ -12,6 +12,7 @@ from razorpay.errors import SignatureVerificationError
 from app.db import get_supabase
 from app.auth import get_current_user
 from app.config import settings
+from app.services.email_service import notify_payment
 from app.services.subscription_policy import (
     NORMAL_PLAN_PRICE_INR,
     PRO_PLAN_PRICE_INR,
@@ -69,7 +70,7 @@ class SubscriptionStatusResponse(BaseModel):
     trial_hours_left: int = 0
     trial_days_left: int = 0
     trial_duration_days: int = 15
-    plan_name: str = "Bedtime Story"
+    plan_name: str = "STORYLAND"
     plan_price_inr: int = SUPER_PLAN_PRICE_INR
     normal_plan_price_inr: int = NORMAL_PLAN_PRICE_INR
     pro_plan_price_inr: int = PRO_PLAN_PRICE_INR  # Rs 151
@@ -137,11 +138,11 @@ def get_subscription_status(current_user: dict = Depends(get_current_user)):
 
     if is_subscribed:
         if tier in SUPER_TIERS:
-            plan_tier, plan_name, plan_price = "super", "Bedtime Story Super", SUPER_PLAN_PRICE_INR
+            plan_tier, plan_name, plan_price = "super", "STORYLAND Super", SUPER_PLAN_PRICE_INR
         elif tier in PRO_TIERS:
-            plan_tier, plan_name, plan_price = "pro", "Bedtime Story Pro", PRO_PLAN_PRICE_INR
+            plan_tier, plan_name, plan_price = "pro", "STORYLAND Pro", PRO_PLAN_PRICE_INR
         else:
-            plan_tier, plan_name, plan_price = "normal", "Bedtime Story Normal", NORMAL_PLAN_PRICE_INR
+            plan_tier, plan_name, plan_price = "normal", "STORYLAND Normal", NORMAL_PLAN_PRICE_INR
     elif is_trial_active:
         plan_tier = "trial"
         plan_name = "Free Trial"
@@ -367,6 +368,9 @@ def _grant_from_subscription(client, supabase, subscription_id: str, payment_ent
                 "captured_at": datetime.now(timezone.utc).isoformat(),
                 "premium_expires_at": expires_at.isoformat(),
             }).execute()
+            # First time we see this charge: thank the buyer (once).
+            notify_payment(user_id, plan_label_for_tier(granted_tier), amount_inr,
+                           base_end, autopay=True)
 
     supabase.table("users").update({
         "subscription_tier": granted_tier,
@@ -652,6 +656,7 @@ def verify_subscription_payment(
     }).eq("id", current_user["id"]).execute()
 
     plan_label = plan_label_for_tier(granted_tier)
+    notify_payment(current_user["id"], plan_label, record.get("amount_inr"), expires_at, autopay=False)
     is_super = granted_tier in SUPER_TIERS
     is_pro_plan = granted_tier in PRO_TIERS
     return {
@@ -722,6 +727,8 @@ async def razorpay_webhook(request: Request):
                     "subscription_expires_at": expires_at.isoformat(),
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 }).eq("id", record["user_id"]).execute()
+                notify_payment(record["user_id"], plan_label_for_tier(granted_tier),
+                               record.get("amount_inr"), expires_at, autopay=False)
 
     elif event == "payment.failed":
         entity = payload.get("payload", {}).get("payment", {}).get("entity", {})

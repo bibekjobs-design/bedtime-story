@@ -515,7 +515,7 @@ export default function PlayerScreen({ story, onBack, onSwitchLanguage }) {
           <Text style={styles.podcastBadge}>
             {story.narrator_name
               ? `Bedtime Tale • Narrated by ${story.narrator_icon || ""} ${story.narrator_name}`
-              : "Bedtime Story Narration"}
+              : "STORYLAND Narration"}
           </Text>
           <Text style={styles.title}>{story.title}</Text>
           {availableLangs.length > 1 ? (

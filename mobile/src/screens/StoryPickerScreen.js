@@ -876,7 +876,7 @@ export default function StoryPickerScreen({
 
       const storyPayload = {
         story_text_id: storyTextId,
-        title: `${convertedRes.title || "Custom Bedtime Story"} (in ${cloneObj.display_name || "Parent's Voice"})`,
+        title: `${convertedRes.title || "Custom Story"} (in ${cloneObj.display_name || "Parent's Voice"})`,
         teaser: convertedRes.teaser,
         full_text: clonedAudioRes.full_text || convertedRes.full_text,
         audio_url: clonedAudioRes.audio_url || convertedRes.audio_url,
@@ -1007,7 +1007,7 @@ export default function StoryPickerScreen({
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingTitle}>
             {generatingCustom
-              ? "✨ Weaving Your Custom Bedtime Story..."
+              ? "✨ Weaving Your Custom Story..."
               : cloningStoryId
               ? "🎙️ Narrating Story in Parent's Voice..."
               : "🌙 Loading Bedtime Tale..."}
@@ -1205,7 +1205,7 @@ export default function StoryPickerScreen({
                   <Text style={styles.lockedEmoji}>✨ 🔒</Text>
                   <Text style={styles.lockedTitle}>Custom AI Bedtime Stories</Text>
                   <Text style={styles.lockedSubtitle}>
-                    Your free trial has ended. Subscribe to Normal (₹{subStatus?.normal_plan_price_inr || 111}/month, 3 stories) or Pro (₹{subStatus?.pro_plan_price_inr || 321}/month, 8 stories + voice cloning) to keep creating new stories!
+                    Your free trial has ended. Upgrade to STORYLAND Super (₹321/month: 5 AI stories + 4 parent-voice stories) to keep creating new stories!
                   </Text>
                   <View style={styles.lockedBenefitsList}>
                     <Text style={styles.lockedBenefitItem}>✨ Up to 8 Original AI bedtime stories every month (Pro)</Text>
@@ -1301,7 +1301,7 @@ export default function StoryPickerScreen({
                   {/* Mode 1: ✍️ Write Story Direct */}
                   {createMode === "text" && (
                     <View style={styles.creatorCard}>
-                      <Text style={styles.creatorCardTitle}>📝 Write Your Bedtime Story or Idea:</Text>
+                      <Text style={styles.creatorCardTitle}>📝 Write Your Story or Idea:</Text>
                       <Text style={styles.uploadSubtext}>
                         Type characters, adventures, or a calming moral lesson. Our AI will weave it into a gentle bedtime tale!
                       </Text>
@@ -1589,12 +1589,12 @@ export default function StoryPickerScreen({
                     <Text style={styles.generateButtonText}>
                       {newStoryRemaining > 0
                         ? createMode === "image"
-                          ? "✨ Transform Book Photo into Bedtime Story"
+                          ? "✨ Transform Book Photo into a Story"
                           : createMode === "file"
-                          ? "✨ Transform Document File into Bedtime Story"
+                          ? "✨ Transform Document File into a Story"
                           : createMode === "search" && selectedConcept
                           ? `✨ Weave & Narrate "${selectedConcept.title.slice(0, 24)}..."`
-                          : "✨ Generate & Narrate Bedtime Story"
+                          : "✨ Generate & Narrate Story"
                         : `⚠️ Monthly Limit Reached (0/${newStoryLimit})`}
                     </Text>
                   </TouchableOpacity>
@@ -1925,7 +1925,7 @@ export default function StoryPickerScreen({
                       >
                         <Text style={styles.generateButtonText}>
                           {cloneRemaining > 0
-                            ? `✨ Transform Book Photo into ${voiceClones.find((c) => c.id === selectedCloneId)?.display_name || "Parent"}'s Bedtime Story`
+                            ? `✨ Transform Book Photo into ${voiceClones.find((c) => c.id === selectedCloneId)?.display_name || "Parent"}'s Story`
                             : `⚠️ Monthly Limit Reached (0/${cloneLimit})`}
                         </Text>
                       </TouchableOpacity>
@@ -1982,7 +1982,7 @@ export default function StoryPickerScreen({
                       >
                         <Text style={styles.generateButtonText}>
                           {cloneRemaining > 0
-                            ? `✨ Transform File into ${voiceClones.find((c) => c.id === selectedCloneId)?.display_name || "Parent"}'s Bedtime Story`
+                            ? `✨ Transform File into ${voiceClones.find((c) => c.id === selectedCloneId)?.display_name || "Parent"}'s Story`
                             : `⚠️ Monthly Limit Reached (0/${cloneLimit})`}
                         </Text>
                       </TouchableOpacity>

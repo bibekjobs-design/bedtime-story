@@ -59,6 +59,19 @@ const PROMPT_SUGGESTIONS = [
 
 const STORAGE_KEY_GENERATED_HISTORY = "@bedtime_user_generated_history";
 
+// "12 days left (ends 24 Oct 2026)" for a paid plan, from its expiry date.
+function planExpiryNote(sub) {
+  const raw = sub?.subscription_expires_at;
+  const d = raw ? new Date(raw) : null;
+  if (!d || isNaN(d.getTime())) return "";
+  const ms = d.getTime() - Date.now();
+  if (ms <= 0) return "";
+  const days = Math.ceil(ms / 86400000);
+  const date = d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  const left = days > 1 ? `${days} days left` : "less than 1 day left";
+  return ` • ${left} (until ${date})`;
+}
+
 export default function StoryPickerScreen({
   selectedAgeGroup,
   selectedCategory,
@@ -958,22 +971,24 @@ export default function StoryPickerScreen({
         ) : subStatus.is_subscribed ? (
           <View style={styles.premiumBanner}>
             <Text style={styles.premiumBannerText}>
-              {subStatus.plan_tier === "pro"
-                ? `👑 STORYLAND Pro Active • ₹${subStatus.pro_plan_price_inr}/mo (5 Custom Stories + 4 Voice Clones)`
-                : `📖 STORYLAND Normal Active • ₹${subStatus.normal_plan_price_inr}/mo (listening plan)`}
+              {(subStatus.plan_tier === "super"
+                ? `👑 STORYLAND Super Active • ₹${subStatus.super_plan_price_inr}/mo (8 Stories + 4 Voice Clones)`
+                : subStatus.plan_tier === "pro"
+                ? `✨ STORYLAND Pro Active • ₹${subStatus.pro_plan_price_inr}/mo (5 Custom Stories)`
+                : `📖 STORYLAND Normal Active • ₹${subStatus.normal_plan_price_inr}/mo (listening plan)`) + planExpiryNote(subStatus)}
             </Text>
           </View>
         ) : subStatus.is_trial_active ? (
           <View style={styles.trialBanner}>
             <View style={styles.trialBannerLeft}>
               <Text style={styles.trialBannerTitle}>
-                ⏳ {subStatus.trial_duration_days || 15}-Day Free Trial Active
+                ⏳ {subStatus.trial_duration_days || 30}-Day Free Trial Active
               </Text>
               <Text style={styles.trialBannerSubtitle}>
                 {subStatus.trial_days_left > 1
                   ? `${subStatus.trial_days_left} days left`
                   : `${subStatus.trial_hours_left} hours left`}{" "}
-                • Unlimited Library • Normal ₹{subStatus.normal_plan_price_inr}/mo or Pro ₹{subStatus.pro_plan_price_inr}/mo after trial
+                • Unlimited Library • Plans from ₹{subStatus.normal_plan_price_inr}/mo after trial
               </Text>
             </View>
             <TouchableOpacity style={styles.trialUpgradeBtn} onPress={onGoToUpgrade}>
@@ -985,7 +1000,7 @@ export default function StoryPickerScreen({
             <View style={styles.trialBannerLeft}>
               <Text style={styles.trialBannerTitle}>🔒 Free Trial Expired</Text>
               <Text style={styles.trialBannerSubtitle}>
-                Library is still free! Subscribe to create new stories — Normal ₹{subStatus.normal_plan_price_inr}/mo or Pro ₹{subStatus.pro_plan_price_inr}/mo
+                Library is still free! Subscribe to create new stories — plans from ₹{subStatus.normal_plan_price_inr}/mo
               </Text>
             </View>
             <TouchableOpacity style={[styles.trialUpgradeBtn, styles.trialUpgradeBtnGlow]} onPress={onGoToUpgrade}>

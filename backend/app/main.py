@@ -33,6 +33,38 @@ app.include_router(privacy.router)
 app.include_router(support.router)
 
 
+# Public legal pages (privacy policy, terms, delete-account) - needed as public
+# links for Google Play and the app menu.
+import os as _os
+from fastapi.responses import FileResponse as _FileResponse, PlainTextResponse as _Plain
+_SITE_DIR = _os.path.join(_os.path.dirname(__file__), "static", "site")
+
+
+def _legal_page(name: str):
+    path = _os.path.join(_SITE_DIR, name)
+    if not _os.path.isfile(path):
+        return _Plain("Page not found", status_code=404)
+    return _FileResponse(path, media_type="text/html")
+
+
+@app.get("/privacy.html", include_in_schema=False)
+@app.get("/privacy", include_in_schema=False)
+def legal_privacy():
+    return _legal_page("privacy.html")
+
+
+@app.get("/terms.html", include_in_schema=False)
+@app.get("/terms", include_in_schema=False)
+def legal_terms():
+    return _legal_page("terms.html")
+
+
+@app.get("/delete-account.html", include_in_schema=False)
+@app.get("/delete-account", include_in_schema=False)
+def legal_delete_account():
+    return _legal_page("delete-account.html")
+
+
 @app.on_event("startup")
 def prewarm_story_cache():
     """Pre-warms library story cache in parallel so mobile devices get instant <1ms response."""

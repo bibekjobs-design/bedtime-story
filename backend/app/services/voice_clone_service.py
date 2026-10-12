@@ -346,16 +346,24 @@ async def narrate_story_with_voice_clone(
                 tts_body = {
                     "text": full_text[:4800],
                     "model_id": tts_model,
-                    "voice_settings": {
-                        "stability": 0.5 if tts_model == ELEVENLABS_V3_MODEL_ID else 0.65,
-                        "similarity_boost": 0.80
-                    }
+                    # Closer-to-the-parent settings. Speaker boost / higher similarity
+                    # are for the Flash model; v3 keeps its simple settings.
+                    "voice_settings": (
+                        {"stability": 0.5, "similarity_boost": 0.80}
+                        if tts_model == ELEVENLABS_V3_MODEL_ID
+                        else {"stability": 0.55, "similarity_boost": 0.90, "style": 0.0, "use_speaker_boost": True}
+                    )
                 }
                 if lang != "en":
                     tts_body["language_code"] = lang
                 tts_url = f"{ELEVENLABS_API_URL}/text-to-speech/{tts_voice_id}"
                 tts_headers = {"xi-api-key": settings.ELEVENLABS_API_KEY, "Content-Type": "application/json"}
                 res = await client.post(tts_url, headers=tts_headers, json=tts_body)
+                if res.status_code in (400, 422) and "use_speaker_boost" in tts_body.get("voice_settings", {}):
+                    # Safety net: if the model refuses the extra settings, use the plain ones.
+                    print(f"[ElevenLabs TTS] extra voice settings rejected ({res.text[:200]}); retrying plain")
+                    tts_body["voice_settings"] = {"stability": 0.65, "similarity_boost": 0.80}
+                    res = await client.post(tts_url, headers=tts_headers, json=tts_body)
                 if res.status_code in (400, 422) and "language_code" in tts_body:
                     # Model rejected the explicit language: let it auto-detect.
                     print(f"[ElevenLabs TTS] language_code rejected ({res.text[:200]}); retrying auto-detect")

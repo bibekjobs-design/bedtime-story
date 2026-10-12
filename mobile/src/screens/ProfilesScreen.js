@@ -57,6 +57,18 @@ export default function ProfilesScreen({
     api.getSubscriptionStatus().then(setSubStatus).catch(() => {});
   }, [user?.id, user?.subscription_tier]);
 
+  // "Plan active - 12 days left (until 24 Oct 2026)" for paid plans.
+  function planEndNote() {
+    const tier = user?.subscription_tier || "";
+    if (!tier || tier === "free" || tier === "free_expired" || tier.startsWith("admin")) return "";
+    const raw = subStatus?.subscription_expires_at || user?.subscription_expires_at;
+    const d = raw ? new Date(raw) : null;
+    if (!d || isNaN(d.getTime()) || d.getTime() <= Date.now()) return "";
+    const days = Math.ceil((d.getTime() - Date.now()) / 86400000);
+    const date = d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    return `⏳ ${days > 1 ? days + " days left" : "Less than 1 day left"} • plan active until ${date}`;
+  }
+
   function autopayEndDate() {
     const raw = subStatus?.subscription_expires_at || user?.subscription_expires_at;
     const d = raw ? new Date(raw) : null;
@@ -408,14 +420,22 @@ export default function ProfilesScreen({
             <View
               style={[
                 styles.tierBadge,
-                isPremium ? styles.tierBadgePremium : isNormal ? styles.tierBadgePremium : styles.tierBadgeFree,
+                isPremium || isProPlan || isNormal ? styles.tierBadgePremium : styles.tierBadgeFree,
               ]}
             >
               <Text style={styles.tierText}>
-                {isPremium ? "👑 Pro" : isNormal ? "📖 Normal" : "Free Plan"}
+                {isPremium ? "👑 Super" : isProPlan ? "✨ Pro" : isNormal ? "📖 Normal" : "Free Plan"}
               </Text>
             </View>
           </View>
+
+          {planEndNote() ? (
+            <Text style={styles.planEndNote}>{planEndNote()}</Text>
+          ) : null}
+
+          <TouchableOpacity style={styles.logoutTopBtn} onPress={onLogout}>
+            <Text style={styles.logoutTopText}>Log Out</Text>
+          </TouchableOpacity>
 
           {/* Auto-renew status (only for users who chose "Subscribe monthly") */}
           {subStatus?.autopay_status === "active" || subStatus?.autopay_status === "authenticated" ? (
@@ -1084,6 +1104,25 @@ const styles = StyleSheet.create({
   addFirstBtnText: {
     color: "#fff",
     fontWeight: "700",
+  },
+  planEndNote: {
+    color: "#c9cbe0",
+    fontSize: 13,
+    marginTop: 10,
+  },
+  logoutTopBtn: {
+    alignSelf: "flex-start",
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e30a14",
+  },
+  logoutTopText: {
+    color: "#ff5a63",
+    fontWeight: "700",
+    fontSize: 13,
   },
   logoutBtn: {
     paddingVertical: 14,

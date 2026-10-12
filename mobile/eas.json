@@ -10,7 +10,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://bedtime-story-icmv.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://bedtime-story-icmv.onrender.com",
+        "EXPO_PUBLIC_SITE_URL": "https://bedtime-story-icmv.onrender.com"
       }
     },
     "production": {
@@ -19,7 +20,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://bedtime-story-icmv.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://bedtime-story-icmv.onrender.com",
+        "EXPO_PUBLIC_SITE_URL": "https://bedtime-story-icmv.onrender.com"
       }
     }
   },

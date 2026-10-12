@@ -8,6 +8,7 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
+  ScrollView,
 } from "react-native";
 import { colors } from "../theme/colors";
 import { api } from "../api/client";
@@ -22,7 +23,8 @@ if (Platform.OS !== "web") {
   }
 }
 
-const TARGET_SECONDS = 23; // 1.5x the original 15s - the read-aloud script needs ~16s at a normal pace
+const TARGET_SECONDS = 75; // ~75s of clean speech gives a much closer voice match
+const MIN_SECONDS = 45; // below this the clone sounds noticeably less like the parent
 
 export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated }) {
   const [voiceName, setVoiceName] = useState("");
@@ -248,6 +250,10 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
       setErrorMessage("Please record your voice sample first.");
       return;
     }
+    if (secondsRecorded < MIN_SECONDS) {
+      setErrorMessage(`Please record at least ${MIN_SECONDS} seconds (you recorded ${secondsRecorded}s) so the voice sounds like you. Tap Re-record.`);
+      return;
+    }
     if (!consentGiven) {
       setErrorMessage("Please confirm parental consent before saving.");
       return;
@@ -286,6 +292,7 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.backdrop}>
         <View style={styles.card}>
+          <ScrollView showsVerticalScrollIndicator={false}>
           {/* Header */}
           <Text style={styles.badge}>🎙️ Parent Voice Studio</Text>
           <Text style={styles.title}>Clone Your Voice</Text>
@@ -311,11 +318,21 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
             />
           </View>
 
+          {/* Recording tips - these decide how close the cloned voice sounds */}
+          <View style={styles.tipsBox}>
+            <Text style={styles.tipsTitle}>⭐ For the closest match to your voice</Text>
+            <Text style={styles.tipsLine}>🔇 Sit in a <Text style={styles.tipsBold}>quiet room</Text> - switch off the fan, TV and AC.</Text>
+            <Text style={styles.tipsLine}>📱 Hold the phone <Text style={styles.tipsBold}>about a hand's width</Text> from your mouth, not at arm's length.</Text>
+            <Text style={styles.tipsLine}>💛 Read <Text style={styles.tipsBold}>warmly, like a real bedtime story</Text> - natural pace, with feeling, not robotic.</Text>
+            <Text style={styles.tipsLine}>⏱️ Read the <Text style={styles.tipsBold}>whole passage (about {TARGET_SECONDS} seconds)</Text>. Longer = more like you.</Text>
+            <Text style={styles.tipsLine}>🗣️ Record in the <Text style={styles.tipsBold}>language you will use most</Text> for stories.</Text>
+          </View>
+
           {/* Passage to Read */}
-          <Text style={styles.label}>Read This Aloud ({TARGET_SECONDS} seconds):</Text>
+          <Text style={styles.label}>Read This Aloud (about {TARGET_SECONDS} seconds):</Text>
           <View style={styles.scriptCard}>
             <Text style={styles.scriptText}>
-              "The stars are shining softly in the deep night sky, and the sleepy moon smiles down to whisper gentle dreams to you. Close your eyes, take a deep breath, and rest easy tonight."
+              "The stars are shining softly in the deep night sky, and the sleepy moon smiles down to whisper gentle dreams to you. Once upon a time, in a quiet little village, there lived a tiny rabbit named Pip. Every evening, Pip looked up at the moon and asked, Are you still awake? And the moon always answered, softly, Always, for you. Oh, how the owls hooted and the fireflies danced! But as the night grew deeper, the whole forest grew calm. The wind slowed down, the leaves went still, and even the river hummed a sleepy tune. So close your eyes now, take a deep breath, and let your shoulders sink into the pillow. Everything is safe, everything is quiet. Sweet dreams, my little star. Goodnight, goodnight, goodnight."
             </Text>
           </View>
 
@@ -437,6 +454,7 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
               )}
             </TouchableOpacity>
           </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -454,6 +472,7 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     maxWidth: 420,
+    maxHeight: "92%",
     backgroundColor: colors.card,
     borderRadius: 24,
     padding: 24,
@@ -511,6 +530,30 @@ const styles = StyleSheet.create({
     fontSize: 15,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+  },
+  tipsBox: {
+    backgroundColor: "rgba(250, 204, 21, 0.12)",
+    borderWidth: 1.5,
+    borderColor: "#facc15",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+  },
+  tipsTitle: {
+    color: "#facc15",
+    fontSize: 14,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  tipsLine: {
+    color: colors.text,
+    fontSize: 12.5,
+    lineHeight: 19,
+    marginBottom: 2,
+  },
+  tipsBold: {
+    fontWeight: "800",
+    color: "#fde68a",
   },
   scriptCard: {
     backgroundColor: "rgba(147, 51, 234, 0.1)",

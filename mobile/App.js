@@ -243,6 +243,15 @@ export default function App() {
 
   const [initialSearchQuery, setInitialSearchQuery] = useState("");
 
+  // Notification button "Open Library": always show a fresh Library, even if
+  // the person is already on it (remount via key + drop the saved feed).
+  const [homeKey, setHomeKey] = useState(0);
+  function openLibraryFresh() {
+    try { clearFeedCache(); } catch (e) {}
+    setHomeKey((k) => k + 1);
+    setCurrentStep("home");
+  }
+
   const isPlayer = currentStep === "player";
   const isAuthScreen = ["login", "register", "forgot", "profiles", "splash"].includes(currentStep);
   const isPremiumUser = ["premium", "premium_monthly", "premium_annual", "admin_vip"].includes(
@@ -278,7 +287,7 @@ export default function App() {
               onAction={(action) => {
                 // Buttons on announcements only ever open screens inside the app.
                 if (action === "plans") setShowSubscriptionModal(true);
-                else if (action === "library") setCurrentStep("home");
+                else if (action === "library") openLibraryFresh();
                 else if (["home", "create", "history"].includes(action)) setCurrentStep(action);
               }}
             />
@@ -462,7 +471,7 @@ export default function App() {
           onNotificationAction={(action) => {
             // Buttons on announcements only ever open screens inside the app.
             if (action === "plans") setShowSubscriptionModal(true);
-            else if (action === "library") setCurrentStep("home");
+            else if (action === "library") openLibraryFresh();
             else if (["home", "create", "history"].includes(action)) setCurrentStep(action);
           }}
         />
@@ -470,6 +479,7 @@ export default function App() {
 
       {currentStep === "home" && (
         <HomeFeedScreen
+          key={homeKey}
           browseLanguage={browseLanguage}
           onBrowseLanguageChange={setBrowseLanguage}
           activeProfile={activeProfile}

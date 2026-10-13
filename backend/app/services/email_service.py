@@ -21,7 +21,7 @@ from app.config import settings
 
 SUPPORT_EMAIL = "storylandconnect@gmail.com"
 BRAND = "STORYLAND"
-ACCENT = "#e30a14"  # the red of the app's "S" logo
+ACCENT = "#e50914"  # the red of the app's "S" logo
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "email_logo.png")
 
 
@@ -96,7 +96,7 @@ def _wrap(title: str, inner_html: str) -> str:
 <tr><td style="background:#101119;padding:16px 28px;">
 <table cellpadding="0" cellspacing="0"><tr>
 <td style="padding-right:14px;"><img src="cid:storyland_logo" width="52" height="52" alt="S" style="display:block;border-radius:12px;border:0;"></td>
-<td style="color:#ffffff;font-size:24px;font-weight:700;letter-spacing:3px;font-family:Georgia,'Times New Roman',serif;">{BRAND}</td>
+<td style="color:#e50914;font-size:24px;font-weight:700;letter-spacing:3px;font-family:Georgia,'Times New Roman',serif;">{BRAND}</td>
 </tr></table></td></tr>
 <tr><td style="height:4px;background:{ACCENT};line-height:4px;font-size:0;">&nbsp;</td></tr>
 <tr><td style="padding:28px;">

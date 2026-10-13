@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, Animated, Easing, StyleSheet, Platform, useWindowDimensions } from "react-native";
+import { View, Text, Image, Animated, Easing, StyleSheet, Platform, useWindowDimensions } from "react-native";
 import { Asset } from "expo-asset";
 import SafeAudio from "../utils/safeAudio";
 
 // Door-lock sound plays at the start while the letters grow in from the middle.
+const LOGO = require("../../assets/logo_badge.png");
 const DOOR_SOUND = require("../../assets/sounds/door_lock.mp3");
 
 // Shown right after login, before the profile picker: the letters of
@@ -21,6 +22,7 @@ export default function StoryLandSplash({ onDone }) {
 
   const anims = useRef(letters.map(() => new Animated.Value(0))).current;
   const fade = useRef(new Animated.Value(1)).current;
+  const logoAnim = useRef(new Animated.Value(0)).current;
   const useNative = Platform.OS !== "web";
 
   useEffect(() => {
@@ -28,13 +30,16 @@ export default function StoryLandSplash({ onDone }) {
       Animated.timing(a, {
         toValue: 1,
         duration: 380,
-        delay: 100 + Math.abs(i - MID) * 150,
+        delay: 900 + Math.abs(i - MID) * 150,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: useNative,
       })
     );
     const run = Animated.sequence([
-      Animated.parallel(slideIns),
+      Animated.parallel([
+        Animated.timing(logoAnim, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: useNative }),
+        ...slideIns,
+      ]),
       Animated.delay(800),
       Animated.timing(fade, { toValue: 0, duration: 800, easing: Easing.in(Easing.quad), useNativeDriver: useNative }),
     ]);
@@ -63,7 +68,16 @@ export default function StoryLandSplash({ onDone }) {
   let k = -1;
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.wordsWrap, { opacity: fade }]}>
+      <Animated.View style={{ alignItems: "center", opacity: fade }}>
+        <Animated.Image
+          source={LOGO}
+          style={{
+            width: 110, height: 110, borderRadius: 24, marginBottom: 28,
+            opacity: logoAnim,
+            transform: [{ scale: logoAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }],
+          }}
+        />
+        <View style={styles.wordsWrap}>
         {WORDS.map((w, wi) => (
           <View key={w} style={[styles.wordRow, wi > 0 && { marginLeft: fontSize * 0.45 }]}>
             {w.split("").map((ch, ci) => {
@@ -81,6 +95,7 @@ export default function StoryLandSplash({ onDone }) {
             })}
           </View>
         ))}
+        </View>
       </Animated.View>
     </View>
   );

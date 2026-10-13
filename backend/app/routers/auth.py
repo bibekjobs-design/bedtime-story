@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime, timedelta, timezone
+import httpx
+from app.config import settings
 
 from app.db import get_supabase
 from app.auth import (
@@ -31,6 +33,10 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str = Field(..., min_length=20)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -198,6 +204,90 @@ def login(payload: LoginRequest):
     safe_user = {k: v for k, v in user.items() if k != "password_hash"}
     apply_admin_overrides(safe_user)
 
+    return {"access_token": token, "token_type": "bearer", "user": safe_user}
+
+
+# --- Login with Google ---
+@router.post("/google", response_model=AuthResponse)
+def google_login(payload: GoogleLoginRequest, background_tasks: BackgroundTasks):
+    """
+    Logs in (or signs up) a user with a Google ID token from the mobile app.
+    The token is checked with Google; it must be for our Web client ID and have a
+    verified email. An existing account with the same email is simply logged in.
+    Same one-device rule and JWT as the normal login.
+    """
+    try:
+        g = httpx.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": payload.id_token},
+            timeout=10,
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="Could not reach Google. Please try again.")
+    if g.status_code != 200:
+        raise HTTPException(status_code=401, detail="Google sign-in failed. Please try again.")
+    claims = g.json()
+
+    allowed_aud = {settings.GOOGLE_WEB_CLIENT_ID}
+    if claims.get("aud") not in allowed_aud:
+        raise HTTPException(status_code=401, detail="Google sign-in failed (wrong app).")
+    if claims.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+        raise HTTPException(status_code=401, detail="Google sign-in failed.")
+    if str(claims.get("email_verified")).lower() != "true":
+        raise HTTPException(status_code=401, detail="Your Google email is not verified.")
+
+    email = (claims.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=401, detail="Google did not share an email address.")
+    full_name = (claims.get("name") or email.split("@")[0])[:100]
+    sub_id = str(claims.get("sub") or "")
+
+    supabase = get_supabase()
+    cols = "id, full_name, email, mobile_number, subscription_tier, subscription_status, email_verified_at"
+    found = supabase.table("users").select(cols).eq("email", email).execute()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    is_new = False
+
+    if found.data:
+        user = found.data[0]
+        if not user.get("email_verified_at"):
+            try:
+                supabase.table("users").update({"email_verified_at": now_iso}).eq("id", user["id"]).execute()
+                user["email_verified_at"] = now_iso
+            except Exception as e:
+                print(f"Warning: could not mark email verified: {e}")
+    else:
+        is_new = True
+        try:
+            created = supabase.table("users").insert({
+                "full_name": full_name,
+                "email": email,
+                # Google users have no password; store a random hash nobody knows.
+                "password_hash": hash_password(generate_secure_token()),
+                # mobile_number is unique, so use a placeholder until the user adds one.
+                "mobile_number": ("g" + sub_id)[:19],
+                "marketing_opt_in": False,
+                "subscription_tier": "free",
+                "subscription_status": "active",
+                "email_verified_at": now_iso,
+            }).execute()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to create account: {e}")
+        if not created.data:
+            raise HTTPException(status_code=500, detail="Failed to create account.")
+        user = {k: v for k, v in created.data[0].items() if k != "password_hash"}
+        background_tasks.add_task(send_welcome_email, email, full_name)
+
+    # New login session (logs out the other device) - same as normal login
+    session_time = datetime.now(timezone.utc).isoformat()
+    try:
+        supabase.table("users").update({"updated_at": session_time}).eq("id", user["id"]).execute()
+    except Exception as e:
+        print(f"Warning: Failed to update login session time: {e}")
+
+    token = create_access_token(user_id=user["id"], email=user["email"], session_time=session_time)
+    safe_user = {k: v for k, v in user.items() if k != "password_hash"}
+    apply_admin_overrides(safe_user)
     return {"access_token": token, "token_type": "bearer", "user": safe_user}
 
 

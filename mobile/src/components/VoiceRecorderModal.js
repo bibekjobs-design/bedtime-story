@@ -297,7 +297,7 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
           <Text style={styles.badge}>🎙️ Parent Voice Studio</Text>
           <Text style={styles.title}>Clone Your Voice</Text>
           <Text style={styles.subtitle}>
-            Read the gentle bedtime passage aloud so stories can be narrated in your voice.
+            Read the gentle passage aloud so stories can be narrated in your voice.
           </Text>
 
           {errorMessage ? (
@@ -323,7 +323,7 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
             <Text style={styles.tipsTitle}>⭐ For the closest match to your voice</Text>
             <Text style={styles.tipsLine}>🔇 Sit in a <Text style={styles.tipsBold}>quiet room</Text> - switch off the fan, TV and AC.</Text>
             <Text style={styles.tipsLine}>📱 Hold the phone <Text style={styles.tipsBold}>about a hand's width</Text> from your mouth, not at arm's length.</Text>
-            <Text style={styles.tipsLine}>💛 Read <Text style={styles.tipsBold}>warmly, like a real bedtime story</Text> - natural pace, with feeling, not robotic.</Text>
+            <Text style={styles.tipsLine}>💛 Read <Text style={styles.tipsBold}>warmly, like a real story</Text> - natural pace, with feeling, not robotic.</Text>
             <Text style={styles.tipsLine}>⏱️ Read the <Text style={styles.tipsBold}>whole passage (about {TARGET_SECONDS} seconds)</Text>. Longer = more like you.</Text>
             <Text style={styles.tipsLine}>🗣️ Record in the <Text style={styles.tipsBold}>language you will use most</Text> for stories.</Text>
           </View>
@@ -423,7 +423,7 @@ export default function VoiceRecorderModal({ visible, onClose, onVoiceCreated })
                 {consentGiven && <Text style={styles.checkmark}>✓</Text>}
               </View>
               <Text style={styles.checkboxLabel}>
-                I am the parent/guardian and this is my own voice (or the person has agreed). I consent to STORYLAND sending this recording to our voice partner (ElevenLabs) to make a voice for bedtime stories only. My cloned voice stays until I delete it. Stories made in my voice are deleted automatically 10 days after they are created, and I can save them before then.</Text>
+                I am the parent/guardian and this is my own voice (or the person has agreed). I consent to STORYLAND sending this recording to our voice partner (ElevenLabs) to make a voice for STORYLAND stories only. My cloned voice stays until I delete it. Stories made in my voice are deleted automatically 10 days after they are created, and I can save them before then.</Text>
             </TouchableOpacity>
           )}
 

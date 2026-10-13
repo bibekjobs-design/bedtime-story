@@ -85,9 +85,8 @@ def _enforce_listen_access(story_text_id: str, current_user: Optional[dict]) -> 
         return
     from app.services.subscription_policy import is_trial_active, SUPER_TIERS, PRO_TIERS
     tier = ((current_user or {}).get("subscription_tier") or "free").lower()
+    # Only paying Pro / Super members (and admin) - free-trial users are locked out too.
     allowed = tier in SUPER_TIERS or tier in PRO_TIERS
-    if tier == "free" and current_user and is_trial_active(current_user.get("created_at")):
-        allowed = True
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

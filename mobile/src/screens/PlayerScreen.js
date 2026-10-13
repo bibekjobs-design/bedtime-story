@@ -323,7 +323,7 @@ export default function PlayerScreen({ story, onBack, onSwitchLanguage }) {
         }
       }
     } catch (err) {
-      Alert.alert("Audio Error", "Could not stream bedtime story: " + err.message);
+      Alert.alert("Audio Error", "Could not stream story: " + err.message);
     } finally {
       setIsBuffering(false);
     }
@@ -438,7 +438,7 @@ export default function PlayerScreen({ story, onBack, onSwitchLanguage }) {
 
   async function handleDownloadOffline() {
     if (isDownloaded) {
-      Alert.alert("Offline Ready", "This bedtime story is already saved for offline listening!");
+      Alert.alert("Offline Ready", "This story is already saved for offline listening!");
       return;
     }
 
@@ -514,7 +514,7 @@ export default function PlayerScreen({ story, onBack, onSwitchLanguage }) {
         <View style={styles.storyDetails}>
           <Text style={styles.podcastBadge}>
             {story.narrator_name
-              ? `Bedtime Tale • Narrated by ${story.narrator_icon || ""} ${story.narrator_name}`
+              ? `STORYLAND • Narrated by ${story.narrator_icon || ""} ${story.narrator_name}`
               : "STORYLAND Narration"}
           </Text>
           <Text style={styles.title}>{story.title}</Text>
@@ -741,7 +741,7 @@ export default function PlayerScreen({ story, onBack, onSwitchLanguage }) {
       <Modal visible={showAmbientModal} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>🎵 Bedtime Soundscapes</Text>
+            <Text style={styles.modalTitle}>🎵 Soundscapes</Text>
             <Text style={styles.modalSubtitle}>
               Calibrated ambient music playing softly beneath the story.
             </Text>

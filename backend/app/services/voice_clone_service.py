@@ -131,7 +131,7 @@ async def register_parent_voice_clone(
             files = {"files": (f"sample.{file_ext}", io.BytesIO(audio_bytes), f"audio/{file_ext}")}
             data = {
                 "name": f"{label} (Parent)",
-                "description": "Parent voice clone for bedtime stories",
+                "description": "Parent voice clone for STORYLAND",
             }
             headers = {"xi-api-key": settings.ELEVENLABS_API_KEY}
             res = await client.post(
@@ -202,7 +202,7 @@ async def narrate_story_with_voice_clone(
         .execute()
     )
     base = supabase.table("story_texts").select("*").eq("id", base_story_text_id).single().execute().data or {}
-    base_title = base.get("title", "Bedtime Tale")
+    base_title = base.get("title", "STORYLAND Tale")
     lang, full_text = _resolve_clone_text(supabase, base, language_code)
     # Each language has its own audio file (…_<lang>.mp3); older rows without a
     # suffix are the story's original language.
@@ -319,8 +319,8 @@ async def narrate_story_with_voice_clone(
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     files = {"files": ("sample.webm", io.BytesIO(sample_data), "audio/webm")}
                     data = {
-                        "name": f"{clone.get('display_name', 'Parent')} (Bedtime)",
-                        "description": "Parent voice clone for bedtime stories",
+                        "name": f"{clone.get('display_name', 'Parent')} (STORYLAND)",
+                        "description": "Parent voice clone for STORYLAND",
                     }
                     headers = {"xi-api-key": settings.ELEVENLABS_API_KEY}
                     v_res = await client.post(f"{ELEVENLABS_API_URL}/voices/add", headers=headers, data=data, files=files)

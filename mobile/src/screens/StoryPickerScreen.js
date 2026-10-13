@@ -45,7 +45,7 @@ const DEFAULT_VOICES = [
     name: "Jasper",
     icon: "✨",
     tone: "Storybook & Cozy",
-    description: "Whimsical & comforting bedtime storyteller",
+    description: "Whimsical & comforting storyteller",
   },
 ];
 
@@ -954,9 +954,9 @@ export default function StoryPickerScreen({
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.ageBadge}>
-            {activeProfile ? `🧸 ${activeProfile.name}` : selectedAgeGroup?.label || "Bedtime Stories"}
+            {activeProfile ? `🧸 ${activeProfile.name}` : selectedAgeGroup?.label || "STORYLAND"}
           </Text>
-          <Text style={styles.categoryTitle}>Bedtime Audio Library</Text>
+          <Text style={styles.categoryTitle}>STORYLAND Audio Library</Text>
         </View>
       </View>
 
@@ -988,7 +988,7 @@ export default function StoryPickerScreen({
                 {subStatus.trial_days_left > 1
                   ? `${subStatus.trial_days_left} days left`
                   : `${subStatus.trial_hours_left} hours left`}{" "}
-                • Unlimited Library • Plans from ₹{subStatus.normal_plan_price_inr}/mo after trial
+                • Pro stories need a Pro/Super plan • Plans from ₹{subStatus.normal_plan_price_inr}/mo after trial
               </Text>
             </View>
             <TouchableOpacity style={styles.trialUpgradeBtn} onPress={onGoToUpgrade}>
@@ -1025,7 +1025,7 @@ export default function StoryPickerScreen({
               ? "✨ Weaving Your Custom Story..."
               : cloningStoryId
               ? "🎙️ Narrating Story in Parent's Voice..."
-              : "🌙 Loading Bedtime Tale..."}
+              : "🌙 Loading story..."}
           </Text>
           <Text style={styles.loadingSubtitle}>
             Calibrating gentle cadence and soothing ambient soundscape (~{countdown}s)
@@ -1046,7 +1046,7 @@ export default function StoryPickerScreen({
               <Text style={styles.accordionHeaderEmoji}>📚</Text>
               <View>
                 <Text style={styles.accordionHeaderTitle}>Library</Text>
-                <Text style={styles.accordionHeaderSub}>Pre-created bedtime stories curated for you</Text>
+                <Text style={styles.accordionHeaderSub}>Pre-created stories curated for you</Text>
               </View>
             </View>
             <Text style={styles.accordionChevron}>
@@ -1060,7 +1060,7 @@ export default function StoryPickerScreen({
               <View style={styles.searchBarContainer}>
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="🔍 Search pre-created bedtime stories..."
+                  placeholder="🔍 Search pre-created stories..."
                   placeholderTextColor={colors.textDim}
                   value={searchQuery}
                   onChangeText={handleSearchLibrary}
@@ -1134,7 +1134,7 @@ export default function StoryPickerScreen({
                   </Text>
                   <Text style={styles.emptyText}>
                     {librarySort === "favorites"
-                      ? "Tap the ❤️ heart icon on any bedtime story to bookmark it for instant bedtime listening!"
+                      ? "Tap the ❤️ heart icon on any story to bookmark it for instant listening!"
                       : "Try searching another word, or switch to the 'Generate' tab to create your own original story!"}
                   </Text>
                 </View>
@@ -1198,7 +1198,7 @@ export default function StoryPickerScreen({
               <Text style={styles.accordionHeaderEmoji}>✨</Text>
               <View>
                 <Text style={styles.accordionHeaderTitle}>Generate Story</Text>
-                <Text style={styles.accordionHeaderSub}>Create a custom AI bedtime tale</Text>
+                <Text style={styles.accordionHeaderSub}>Create a custom AI story</Text>
               </View>
             </View>
             <View style={styles.accordionHeaderRight}>
@@ -1218,12 +1218,12 @@ export default function StoryPickerScreen({
               {(!subStatus?.is_subscribed && !subStatus?.is_trial_active) ? (
                 <View style={styles.lockedFeatureCard}>
                   <Text style={styles.lockedEmoji}>✨ 🔒</Text>
-                  <Text style={styles.lockedTitle}>Custom AI Bedtime Stories</Text>
+                  <Text style={styles.lockedTitle}>Custom AI Stories</Text>
                   <Text style={styles.lockedSubtitle}>
                     Your free trial has ended. Upgrade to STORYLAND Super (₹321/month: 5 AI stories + 4 parent-voice stories) to keep creating new stories!
                   </Text>
                   <View style={styles.lockedBenefitsList}>
-                    <Text style={styles.lockedBenefitItem}>✨ Up to 8 Original AI bedtime stories every month (Pro)</Text>
+                    <Text style={styles.lockedBenefitItem}>✨ Up to 8 Original AI stories every month (Super)</Text>
                     <Text style={styles.lockedBenefitItem}>🎙️ Choose storyteller voices (Luna, Oliver, Willow, Jasper)</Text>
                     <Text style={styles.lockedBenefitItem}>🧸 Weave your child's name into personalized tales</Text>
                     <Text style={styles.lockedBenefitItem}>🌲 Story-matched ambient sleep soundscapes</Text>
@@ -1318,7 +1318,7 @@ export default function StoryPickerScreen({
                     <View style={styles.creatorCard}>
                       <Text style={styles.creatorCardTitle}>📝 Write Your Story or Idea:</Text>
                       <Text style={styles.uploadSubtext}>
-                        Type characters, adventures, or a calming moral lesson. Our AI will weave it into a gentle bedtime tale!
+                        Type characters, adventures, or a calming moral lesson. Our AI will weave it into a gentle story!
                       </Text>
                       <TextInput
                         style={[styles.creatorInput, { minHeight: 90, textAlignVertical: "top" }]}
@@ -1357,7 +1357,7 @@ export default function StoryPickerScreen({
                     <View style={styles.uploadDropCard}>
                       <Text style={styles.creatorCardTitle}>📸 Snap a Storybook Page</Text>
                       <Text style={styles.uploadSubtext}>
-                        Take a photo of any storybook page, children's poem, or screenshot. Our AI will turn it into a soothing bedtime audio story!
+                        Take a photo of any storybook page, children's poem, or screenshot. Our AI will turn it into a soothing audio story!
                       </Text>
 
                       {selectedImage ? (
@@ -1369,7 +1369,7 @@ export default function StoryPickerScreen({
                           />
                           <View style={styles.imagePreviewMeta}>
                             <Text style={styles.imagePreviewTitle}>📖 Page Captured!</Text>
-                            <Text style={styles.imagePreviewSub}>Ready to transform into bedtime tale</Text>
+                            <Text style={styles.imagePreviewSub}>Ready to transform into a story</Text>
                             <TouchableOpacity
                               style={styles.changeFileButton}
                               onPress={() => setSelectedImage(null)}
@@ -1409,7 +1409,7 @@ export default function StoryPickerScreen({
                     <View style={styles.uploadDropCard}>
                       <Text style={styles.creatorCardTitle}>📁 Upload Story File</Text>
                       <Text style={styles.uploadSubtext}>
-                        Select a children's book PDF, text file (.txt), or reading document. We will read it and weave it into a gentle bedtime tale.
+                        Select a children's book PDF, text file (.txt), or reading document. We will read it and weave it into a gentle story.
                       </Text>
 
                       {selectedPdf ? (
@@ -1518,7 +1518,7 @@ export default function StoryPickerScreen({
                   <View style={styles.narratorSection}>
                     <Text style={styles.narratorSectionTitle}>🎙️ 3. Choose Storyteller Narrator</Text>
                     <Text style={styles.narratorSectionSubtitle}>
-                      Select your favorite soothing bedtime voice persona
+                      Select your favorite soothing voice persona
                     </Text>
 
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.voiceCarousel}>
@@ -1652,7 +1652,7 @@ export default function StoryPickerScreen({
                   <Text style={styles.lockedEmoji}>🎙️ 🔒</Text>
                   <Text style={styles.lockedTitle}>Parent Voice Cloning</Text>
                   <Text style={styles.lockedSubtitle}>
-                    Narrating bedtime stories in Mom or Dad's cloned voice is a Pro feature (₹{subStatus?.pro_plan_price_inr || 321}/month) — not included in Normal.
+                    Narrating stories in Mom or Dad's cloned voice is a Super feature (₹321/month) — not included in Normal or Pro.
                   </Text>
                   <View style={styles.lockedBenefitsList}>
                     <Text style={styles.lockedBenefitItem}>🎙️ 4 Full Parent Voice Narrations every month (up to ~3 min / 2,430 characters each)</Text>
@@ -1692,7 +1692,7 @@ export default function StoryPickerScreen({
                       <Text style={styles.noClonesEmoji}>🎙️</Text>
                       <Text style={styles.noClonesTitle}>No Parent Voice Recorded Yet</Text>
                       <Text style={styles.noClonesText}>
-                        Record a 30-second reading sample so your child can hear bedtime stories in Dad or Mom's voice.
+                        Record a 30-second reading sample so your child can hear stories in Dad or Mom's voice.
                       </Text>
                       <TouchableOpacity style={styles.upgradeCloneBtn} onPress={onGoToUpgrade}>
                         <Text style={styles.upgradeCloneBtnText}>➕ Set Up Parent Voice Clone</Text>
@@ -1827,7 +1827,7 @@ export default function StoryPickerScreen({
                         📝 Write Story for {voiceClones.find((c) => c.id === selectedCloneId)?.display_name || "Parent"} to Narrate:
                       </Text>
                       <Text style={styles.uploadSubtext}>
-                        Describe an adventure, family memory, or gentle bedtime moral. We'll weave it and narrate in your voice!
+                        Describe an adventure, family memory, or gentle moral. We'll weave it and narrate in your voice!
                       </Text>
                       <TextInput
                         style={[styles.creatorInput, { minHeight: 90, textAlignVertical: "top" }]}
@@ -1883,7 +1883,7 @@ export default function StoryPickerScreen({
                     <View style={styles.uploadDropCard}>
                       <Text style={styles.creatorCardTitle}>📸 Snap a Storybook Page</Text>
                       <Text style={styles.uploadSubtext}>
-                        Take a photo of any children's book. {voiceClones.find((c) => c.id === selectedCloneId)?.display_name || "Parent"}'s voice will read it as a soothing bedtime tale!
+                        Take a photo of any children's book. {voiceClones.find((c) => c.id === selectedCloneId)?.display_name || "Parent"}'s voice will read it as a soothing story!
                       </Text>
 
                       {cloneImage ? (
@@ -2096,7 +2096,7 @@ export default function StoryPickerScreen({
                   ).length > 0 && (
                     <View style={{ marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: "rgba(255, 255, 255, 0.08)" }}>
                       <Text style={[styles.sectionTitle, { marginBottom: 10 }]}>
-                        🎧 Replay Bedtime Stories in Parent Voice ({generatedHistory.filter(
+                        🎧 Replay Stories in Parent Voice ({generatedHistory.filter(
                           (h) => h.origin === "cloned" || h.voice_tier === "cloned" || h.narrator_icon === "🎙️"
                         ).length}):
                       </Text>
@@ -2163,7 +2163,7 @@ export default function StoryPickerScreen({
           {openSection === "history" && (
           <View style={[styles.tabContent, styles.accordionBody]}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>📚 Bedtime History ({generatedHistory.length})</Text>
+                <Text style={styles.sectionTitle}>📚 Story History ({generatedHistory.length})</Text>
               </View>
 
               {loadingHistory ? (
@@ -2171,9 +2171,9 @@ export default function StoryPickerScreen({
               ) : generatedHistory.length === 0 ? (
                 <View style={styles.emptyBox}>
                   <Text style={styles.emptyEmoji}>📖</Text>
-                  <Text style={styles.emptyTitle}>No bedtime history yet</Text>
+                  <Text style={styles.emptyTitle}>No story history yet</Text>
                   <Text style={styles.emptyText}>
-                    All stories you listen to from the Library, AI Generator, or Parent Voice Clones will appear here for 1-tap bedtime replay!
+                    All stories you listen to from the Library, AI Generator, or Parent Voice Clones will appear here for 1-tap replay!
                   </Text>
                   <TouchableOpacity
                     style={[styles.listenNowButton, { marginTop: 16 }]}

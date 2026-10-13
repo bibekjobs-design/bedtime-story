@@ -290,7 +290,7 @@ export default function HistoryScreen({ step, onPlayStory, onGoToHome }) {
         ) : totalCount === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyEmoji}>📖</Text>
-            <Text style={styles.emptyTitle}>No bedtime history yet</Text>
+            <Text style={styles.emptyTitle}>No story history yet</Text>
             <Text style={styles.emptyText}>
               Every story you listen to from Home, the AI Generator, or Parent Voice Clones
               will show up here, in rows by type, so you can replay it in one tap.

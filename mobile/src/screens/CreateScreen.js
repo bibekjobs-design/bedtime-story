@@ -321,7 +321,7 @@ export default function CreateScreen({
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Create a story</Text>
-        <Text style={styles.subtitle}>Turn any PDF, TXT or DOCX into a bedtime story.</Text>
+        <Text style={styles.subtitle}>Turn any PDF, TXT or DOCX into a STORYLAND story.</Text>
 
         <View style={styles.limitsRow}>
           <View style={styles.limitBadge}>

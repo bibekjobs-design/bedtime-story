@@ -87,7 +87,7 @@ NARRATOR_VOICES = {
         "voice_name": "en-US-Chirp3-HD-Kore",
         "fallback_voice": "en-US-Neural2-F",
         "tone": "Calm & Whispering",
-        "description": "Peaceful, whispery & serene bedtime narrator",
+        "description": "Peaceful, whispery & serene storyteller",
         "preview_text": "Close your eyes, little dreamer, and listen to the whisper of the stars."
     },
     "jasper": {
@@ -98,7 +98,7 @@ NARRATOR_VOICES = {
         "voice_name": "en-US-Chirp3-HD-Puck",
         "fallback_voice": "en-US-Journey-O",
         "tone": "Storybook & Cozy",
-        "description": "Whimsical, classic bedtime storyteller",
+        "description": "Whimsical, classic storyteller",
         "preview_text": "Close your eyes, little dreamer, and listen to the whisper of the stars."
     }
 }

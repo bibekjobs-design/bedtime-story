@@ -91,7 +91,7 @@ async function request(endpoint, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
         // non-json response
       }
 
-      if (res.status === 401 && !endpoint.includes("/api/auth/login")) {
+      if (res.status === 401 && !endpoint.includes("/api/auth/login") && !endpoint.includes("/api/auth/google")) {
         if (typeof onUnauthorizedCallback === "function") {
           onUnauthorizedCallback(errorMsg);
         }
@@ -374,6 +374,11 @@ export const api = {
     request("/api/auth/login", {
       method: "POST",
       body: JSON.stringify(data),
+    }),
+  googleLogin: (idToken) =>
+    request("/api/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ id_token: idToken }),
     }),
   forgotPassword: (email) =>
     request("/api/auth/forgot-password", {

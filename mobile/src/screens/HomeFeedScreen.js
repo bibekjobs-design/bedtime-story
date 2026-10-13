@@ -210,7 +210,7 @@ export default function HomeFeedScreen({
     !isAdmin &&
     story &&
     story.access_level === "pro" &&
-    ["normal_monthly", "free_expired"].includes(currentUser?.subscription_tier);
+    !["pro_monthly", "premium", "premium_monthly", "premium_annual", "admin", "admin_vip"].includes(currentUser?.subscription_tier);
   const [accessLevel, setAccessLevel] = useState(null);
   const [editAccessLevel, setEditAccessLevel] = useState(null);
 

@@ -73,7 +73,7 @@ export default function RegisterScreen({ onRegisterSuccess, onGoToLogin, onBack 
         <Text style={styles.badge}>New Parent Account</Text>
         <Text style={styles.title}>Create Account</Text>
         <Text style={styles.subtitle}>
-          Sign up to access personalized stories, multiple child profiles, and offline bedtime playback.
+          Sign up to access personalized stories, multiple child profiles, and offline playback.
         </Text>
       </View>
 
@@ -170,7 +170,7 @@ export default function RegisterScreen({ onRegisterSuccess, onGoToLogin, onBack 
             {marketingOptIn && <Text style={styles.checkmark}>✓</Text>}
           </View>
           <Text style={styles.checkboxLabel}>
-            Send me gentle bedtime story recommendations and product updates (optional).
+            Send me gentle story recommendations and product updates (optional).
           </Text>
         </TouchableOpacity>
 

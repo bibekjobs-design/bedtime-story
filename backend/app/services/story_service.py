@@ -285,7 +285,7 @@ def derive_teaser_from_text(text: str, max_words: int = 20) -> str:
         return match.group(0).strip()
     words = (text or "").strip().split()
     snippet = " ".join(words[:max_words])
-    return snippet + ("..." if len(words) > max_words else "") if snippet else "A cozy bedtime story."
+    return snippet + ("..." if len(words) > max_words else "") if snippet else "A cozy story."
 
 
 def call_gemini_with_fallback(
@@ -508,7 +508,7 @@ def rate_story(
         "rating": rating,
         "average_rating": avg_rating,
         "total_ratings": total_count,
-        "message": "Thank you for rating this bedtime story!"
+        "message": "Thank you for rating this story!"
     }
 
 
@@ -721,7 +721,7 @@ def _precreated_core(
         age_res = supabase.table("age_groups").select("label").eq("id", age_group_id).single().execute()
         lang_res = supabase.table("languages").select("label").eq("id", language_id).single().execute()
 
-        cat_name = cat_res.data["name"] if cat_res.data else "Bedtime"
+        cat_name = cat_res.data["name"] if cat_res.data else "Stories"
         age_label = age_res.data["label"] if age_res.data else "kids"
         lang_label = lang_res.data["label"] if lang_res.data else "English"
 
@@ -731,7 +731,7 @@ def _precreated_core(
                 "category_id": category_id,
                 "age_group_id": age_group_id,
                 "language_id": language_id,
-                "title": item.get("title", "Bedtime Tale"),
+                "title": item.get("title", "STORYLAND Tale"),
                 "teaser": item.get("teaser", ""),
                 "generation_status": "teaser_only",
                 "safety_check_status": "passed",
@@ -932,7 +932,7 @@ Respond strictly with a JSON object:
             )
         )
         data = clean_json_response(response.text)
-        return bool(data.get("is_safe", True)), data.get("notes", "Passed automated bedtime safety check.")
+        return bool(data.get("is_safe", True)), data.get("notes", "Passed automated safety check.")
     except Exception as exc:
         # Fallback if safety review model call experiences transient issues
         return True, f"Defaulted safe with note: {str(exc)}"
@@ -1004,7 +1004,7 @@ def _search_core(
         )
         age_res = supabase.table("age_groups").select("label").eq("id", age_group_id).single().execute()
         lang_res = supabase.table("languages").select("label").eq("id", language_id).single().execute()
-        category_name = cat_res.data["name"] if cat_res.data else "Bedtime"
+        category_name = cat_res.data["name"] if cat_res.data else "Stories"
         age_label = age_res.data["label"] if age_res.data else "kids"
         language_label = lang_res.data["label"] if lang_res.data else "English"
 
@@ -1020,7 +1020,7 @@ Return JSON: {{"title": "...", "teaser": "..."}}"""
         )
         data = clean_json_response(resp.text)
         title = data.get("title", f"Story about {q}")
-        teaser = data.get("teaser", f"A cozy bedtime story about {q}.")
+        teaser = data.get("teaser", f"A cozy story about {q}.")
 
         full_text = generate_full_story_text(
             title=title,
@@ -1064,10 +1064,42 @@ def _resolve_labels(supabase, category_id: str, age_group_id: int, language_id: 
     cat_res = supabase.table("story_categories").select("name").eq("id", category_id).single().execute()
     age_res = supabase.table("age_groups").select("label").eq("id", age_group_id).single().execute()
     lang_res = supabase.table("languages").select("label").eq("id", language_id).single().execute()
-    category_name = cat_res.data["name"] if cat_res.data else "Bedtime"
+    category_name = cat_res.data["name"] if cat_res.data else "Stories"
     age_label = age_res.data["label"] if age_res.data else "kids"
     language_label = lang_res.data["label"] if lang_res.data else "English"
     return category_name, age_label, language_label
+
+
+COVER_MAX_PX = 1000   # longest side; cards are small, the hero card is about phone width
+COVER_QUALITY = 82
+
+
+def _optimize_cover(data: bytes, mime: str = None):
+    """Shrinks a cover picture to a phone-friendly JPEG (usually 50-150 KB instead of
+    several MB) so the Library loads fast. If anything goes wrong the original
+    picture is kept unchanged. Returns (bytes, mime, ext)."""
+    try:
+        import io
+        from PIL import Image, ImageOps
+        im = Image.open(io.BytesIO(data))
+        im = ImageOps.exif_transpose(im)
+        if im.mode in ("RGBA", "LA", "P"):
+            bg = Image.new("RGB", im.size, (255, 255, 255))
+            rgba = im.convert("RGBA")
+            bg.paste(rgba, mask=rgba.split()[-1])
+            im = bg
+        else:
+            im = im.convert("RGB")
+        im.thumbnail((COVER_MAX_PX, COVER_MAX_PX))
+        out = io.BytesIO()
+        im.save(out, format="JPEG", quality=COVER_QUALITY, optimize=True, progressive=True)
+        small = out.getvalue()
+        if len(small) < len(data) or "png" in (mime or "").lower():
+            return small, "image/jpeg", "jpg"
+    except Exception as e:
+        print(f"Cover optimise skipped: {e}")
+    ext = "png" if "png" in (mime or "").lower() else "jpg"
+    return data, (mime or "image/jpeg"), ext
 
 
 def publish_manual_story(
@@ -1151,14 +1183,15 @@ def publish_manual_story(
 
     if cover_image_bytes:
         try:
-            ext = "png" if "png" in (cover_image_mime or "").lower() else "jpg"
+            cover_image_bytes, cover_image_mime, ext = _optimize_cover(cover_image_bytes, cover_image_mime)
             storage_path = f"{new_story['id']}.{ext}"
             supabase.storage.from_("story-covers").upload(
                 path=storage_path,
                 file=cover_image_bytes,
-                file_options={"content-type": cover_image_mime or "image/jpeg", "upsert": "true"},
+                file_options={"content-type": cover_image_mime or "image/jpeg", "upsert": "true", "cache-control": "31536000"},
             )
             cover_url = supabase.storage.from_("story-covers").get_public_url(storage_path)
+            cover_url = f"{cover_url.split('?')[0]}?v={int(__import__('time').time())}"
             supabase.table("story_texts").update({"cover_image_url": cover_url}).eq("id", new_story["id"]).execute()
             new_story["cover_image_url"] = cover_url
             new_story["cover_image_upload_failed"] = False
@@ -1312,14 +1345,15 @@ def update_manual_story(
     cover_image_upload_failed = None
     if cover_image_bytes:
         try:
-            ext = "png" if "png" in (cover_image_mime or "").lower() else "jpg"
+            cover_image_bytes, cover_image_mime, ext = _optimize_cover(cover_image_bytes, cover_image_mime)
             storage_path = f"{story_text_id}.{ext}"
             supabase.storage.from_("story-covers").upload(
                 path=storage_path,
                 file=cover_image_bytes,
-                file_options={"content-type": cover_image_mime or "image/jpeg", "upsert": "true"},
+                file_options={"content-type": cover_image_mime or "image/jpeg", "upsert": "true", "cache-control": "31536000"},
             )
             cover_url = supabase.storage.from_("story-covers").get_public_url(storage_path)
+            cover_url = f"{cover_url.split('?')[0]}?v={int(__import__('time').time())}"
             supabase.table("story_texts").update({"cover_image_url": cover_url}).eq("id", story_text_id).execute()
             cover_image_upload_failed = False
         except Exception as e:
@@ -1445,11 +1479,11 @@ def generate_custom_story(
     age_res = supabase.table("age_groups").select("label").eq("id", age_group_id).limit(1).execute()
     age_label = age_res.data[0]["label"] if (age_res.data and len(age_res.data) > 0) else "kids"
 
-    cat_name = "Bedtime Adventures"
+    cat_name = "STORYLAND Adventures"
     if category_id:
         cat_res = supabase.table("story_categories").select("name").eq("id", category_id).limit(1).execute()
         if cat_res.data:
-            cat_name = cat_res.data[0].get("name", "Bedtime")
+            cat_name = cat_res.data[0].get("name", "Stories")
     else:
         # Default category
         cat_res = supabase.table("story_categories").select("id, name").limit(1).execute()
@@ -1591,11 +1625,11 @@ def generate_multimodal_story(
     age_res = supabase.table("age_groups").select("label").eq("id", age_group_id).limit(1).execute()
     age_label = age_res.data[0]["label"] if age_res.data else "kids"
 
-    cat_name = "Bedtime Adventures"
+    cat_name = "STORYLAND Adventures"
     if category_id:
         cat_res = supabase.table("story_categories").select("name").eq("id", category_id).limit(1).execute()
         if cat_res.data:
-            cat_name = cat_res.data[0].get("name", "Bedtime")
+            cat_name = cat_res.data[0].get("name", "Stories")
     else:
         cat_res = supabase.table("story_categories").select("id, name").limit(1).execute()
         if cat_res.data:
@@ -2002,12 +2036,12 @@ def commit_and_narrate_story(
         age_res = supabase.table("age_groups").select("label").eq("id", story["age_group_id"]).single().execute()
         lang_label_res = supabase.table("languages").select("label").eq("id", story["language_id"]).single().execute()
 
-        category_name = cat_res.data["name"] if cat_res and cat_res.data else "Bedtime"
+        category_name = cat_res.data["name"] if cat_res and cat_res.data else "Stories"
         age_label = age_res.data["label"] if age_res.data else "kids"
         language_label = lang_label_res.data["label"] if lang_label_res.data else "English"
 
         generated_text = generate_full_story_text(
-            title=story.get("title", "Bedtime Tale"),
+            title=story.get("title", "STORYLAND Tale"),
             teaser=story.get("teaser", ""),
             category_name=category_name,
             age_label=age_label,
@@ -2024,7 +2058,7 @@ def commit_and_narrate_story(
                 "safety_check_status": "failed"
             }).eq("id", story_text_id).execute()
             raise ValueError(
-                "This story didn't pass our bedtime safety check and can't be narrated. "
+                "This story didn't pass our safety check and can't be narrated. "
                 "Please try another story."
             )
 

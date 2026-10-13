@@ -71,7 +71,7 @@ export default function CategoryScreen({ selectedAgeGroup, onBack, onSelectCateg
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search themes or type any custom bedtime idea..."
+          placeholder="Search themes or type any custom story idea..."
           placeholderTextColor="rgba(255, 255, 255, 0.4)"
           value={searchQuery}
           onChangeText={(text) => setSearchQuery(text)}
@@ -116,10 +116,10 @@ export default function CategoryScreen({ selectedAgeGroup, onBack, onSelectCateg
         <View style={styles.customStoryBox}>
           <Text style={styles.customStoryIcon}>✨</Text>
           <Text style={styles.customStoryTitle}>
-            Weave a bedtime story about "{searchQuery}"
+            Weave a story about "{searchQuery}"
           </Text>
           <Text style={styles.customStoryDesc}>
-            No fixed theme matches this name, but we can generate a soothing, original bedtime story about it right now!
+            No fixed theme matches this name, but we can generate a soothing, original story about it right now!
           </Text>
           <TouchableOpacity
             style={styles.customStoryBtn}

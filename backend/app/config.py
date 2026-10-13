@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     RAZORPAY_PLAN_ID_PRO: str = "plan_Tig4n02bWl8xML"
     RAZORPAY_PLAN_ID_PRO151: str = "plan_TkJL8NacDgCKLt"
 
+    # Google sign-in: the Web client ID (public value) that Google ID tokens must be issued for
+    GOOGLE_WEB_CLIENT_ID: str = "1025505666090-5gi9l4j37k4ermm2lhelcf8bpe3pdf6u.apps.googleusercontent.com"
+
     # JWT Auth
     JWT_SECRET_KEY: str = "change-this-to-a-long-random-secret-in-production"
     JWT_ALGORITHM: str = "HS256"

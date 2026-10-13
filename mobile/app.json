@@ -29,10 +29,11 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "@react-native-google-signin/google-signin",
       [
         "expo-audio",
         {
-          "microphonePermission": "STORYLAND needs the microphone so a parent can record their voice for bedtime stories."
+          "microphonePermission": "STORYLAND needs the microphone so a parent can record their voice for STORYLAND stories."
         }
       ]
     ],

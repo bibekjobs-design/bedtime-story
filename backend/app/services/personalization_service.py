@@ -122,7 +122,7 @@ def create_or_get_personalized_story(
         raise ValueError("Base story not found.")
 
     base_story = base_story_res.data
-    cat_name = base_story.get("story_categories", {}).get("name", "Bedtime")
+    cat_name = base_story.get("story_categories", {}).get("name", "Stories")
     age_label = base_story.get("age_groups", {}).get("label", "kids")
     lang_label = base_story.get("languages", {}).get("label", "English")
     lang_code = base_story.get("languages", {}).get("code", "en")
@@ -155,7 +155,7 @@ def create_or_get_personalized_story(
 
     # 6. Safety check
     is_safe, safety_notes = verify_content_safety(
-        title=f"{child_name}'s Bedtime Journey",
+        title=f"{child_name}'s STORYLAND Journey",
         story_text=full_text,
         age_label=age_label
     )

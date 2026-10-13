@@ -141,7 +141,7 @@ def send_welcome_email(email: str, full_name: str) -> bool:
         f"Hi {full_name},\n\n"
         f"Welcome to {BRAND}! We're so glad you're here.\n\n"
         f"Your 30-day free trial has started. Here is what you can enjoy:\n"
-        f"- A Library of calming bedtime stories\n"
+        f"- A Library of calming stories\n"
         f"- Stories narrated in 5 languages: English, Hindi, Bengali, Kannada and Telugu\n"
         f"- A sleep timer, so the story stops by itself once your child is asleep\n"
         f"- Calming background sounds and child profiles for the whole family\n\n"
@@ -151,7 +151,7 @@ def send_welcome_email(email: str, full_name: str) -> bool:
     html = _wrap(f"Welcome to {BRAND}!", (
         f'<p>Hi {name},</p><p>We are so glad you are here. Your <b>30-day free trial</b> has started.</p>'
         '<ul style="padding-left:18px;line-height:1.7;">'
-        '<li>A Library of calming bedtime stories</li>'
+        '<li>A Library of calming stories</li>'
         '<li>Stories narrated in 5 languages: English, Hindi, Bengali, Kannada &amp; Telugu</li>'
         '<li>A sleep timer - the story stops by itself once your child is asleep</li>'
         '<li>Calming background sounds and child profiles for the whole family</li>'

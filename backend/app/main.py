@@ -5,7 +5,7 @@ from app.db import get_supabase
 
 app = FastAPI(
     title="STORYLAND API",
-    description="Backend API for AI-powered podcast-style Bedtime Stories for kids.",
+    description="Backend API for AI-powered podcast-style stories for kids.",
     version="1.0.0"
 )
 

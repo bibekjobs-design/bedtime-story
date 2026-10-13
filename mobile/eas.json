@@ -11,7 +11,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://bedtime-story-icmv.onrender.com",
-        "EXPO_PUBLIC_SITE_URL": "https://bedtime-story-icmv.onrender.com"
+        "EXPO_PUBLIC_SITE_URL": "https://bedtime-story-icmv.onrender.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1025505666090-5gi9l4j37k4ermm2lhelcf8bpe3pdf6u.apps.googleusercontent.com"
       }
     },
     "production": {
@@ -21,7 +22,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://bedtime-story-icmv.onrender.com",
-        "EXPO_PUBLIC_SITE_URL": "https://bedtime-story-icmv.onrender.com"
+        "EXPO_PUBLIC_SITE_URL": "https://bedtime-story-icmv.onrender.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1025505666090-5gi9l4j37k4ermm2lhelcf8bpe3pdf6u.apps.googleusercontent.com"
       }
     }
   },

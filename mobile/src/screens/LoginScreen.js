@@ -15,6 +15,7 @@ import { colors } from "../theme/colors";
 import { api } from "../api/client";
 import { authStorage } from "../api/authStorage";
 import SLogo from "../components/SLogo";
+import { signInWithGoogle, googleSignInAvailable } from "../api/googleSignIn";
 
 // Unified auth screen: hero illustration + a single sheet with Log In / Sign Up
 // as switchable tabs (no screen navigation between them). All Login and Sign Up
@@ -63,6 +64,53 @@ export default function LoginScreen({
       setLoading(false);
     }
   }
+
+  // --- Google sign-in (Android app only) ---
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const showGoogle = Platform.OS === "android" && googleSignInAvailable();
+
+  async function handleGoogle() {
+    try {
+      setGoogleLoading(true);
+      const idToken = await signInWithGoogle();
+      const res = await api.googleLogin(idToken);
+      await authStorage.saveToken(res.access_token);
+      await authStorage.saveUser(res.user);
+      onLoginSuccess(res.user);
+    } catch (err) {
+      if (err && err.code === "cancelled") return;
+      Alert.alert("Google Sign-In Failed", (err && err.message) || "Please try again.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
+  const googleBlock = showGoogle ? (
+    <View>
+      <TouchableOpacity
+        style={styles.googleBtn}
+        onPress={handleGoogle}
+        disabled={googleLoading}
+        activeOpacity={0.85}
+      >
+        {googleLoading ? (
+          <ActivityIndicator color="#1f1f1f" />
+        ) : (
+          <>
+            <Text style={styles.googleG}>G</Text>
+            <Text style={styles.googleText}>
+              {activeTab === "login" ? "Continue with Google" : "Sign up with Google"}
+            </Text>
+          </>
+        )}
+      </TouchableOpacity>
+      <View style={styles.orRow}>
+        <View style={styles.orLine} />
+        <Text style={styles.orText}>{activeTab === "login" ? "or use email" : "or sign up with email"}</Text>
+        <View style={styles.orLine} />
+      </View>
+    </View>
+  ) : null;
 
   // --- Sign Up state (unchanged from RegisterScreen.js) ---
   const [fullName, setFullName] = useState("");
@@ -127,7 +175,7 @@ export default function LoginScreen({
         <Text style={styles.sheetSubtitle}>
           {activeTab === "login"
             ? "Log in to continue your stories"
-            : "Start your bedtime story journey"}
+            : "Start your STORYLAND journey"}
         </Text>
 
         {/* Tab switcher */}
@@ -145,6 +193,8 @@ export default function LoginScreen({
             <Text style={[styles.tabText, activeTab === "signup" && styles.tabTextActive]}>Sign Up</Text>
           </TouchableOpacity>
         </View>
+
+        {googleBlock}
 
         {activeTab === "login" ? (
           <View style={styles.form}>
@@ -303,7 +353,7 @@ export default function LoginScreen({
                 {marketingOptIn && <Text style={styles.checkmark}>✓</Text>}
               </View>
               <Text style={styles.checkboxLabel}>
-                Send me gentle bedtime story recommendations and product updates (optional).
+                Send me gentle story recommendations and product updates (optional).
               </Text>
             </TouchableOpacity>
 
@@ -506,6 +556,41 @@ const styles = StyleSheet.create({
     color: "#8d90a0",
     fontSize: 13,
     lineHeight: 18,
+  },
+  googleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    paddingVertical: 14,
+    minHeight: 50,
+  },
+  googleG: {
+    color: "#4285F4",
+    fontSize: 20,
+    fontWeight: "900",
+    marginRight: 10,
+  },
+  googleText: {
+    color: "#1f1f1f",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  orRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 16,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: LINE,
+  },
+  orText: {
+    color: "#6b6e80",
+    fontSize: 12,
+    marginHorizontal: 10,
   },
   submitBtn: {
     backgroundColor: FIELD, // same as the email / password fields

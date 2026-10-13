@@ -750,7 +750,7 @@ def generate_category_image_endpoint(category_id: str, current_user: dict = Depe
     try:
         image_url = generate_category_image(
             category_id=category_id,
-            category_name=category.get("name", "Bedtime"),
+            category_name=category.get("name", "Stories"),
             category_description=category.get("description", "") or "",
         )
         return {"category_id": category_id, "image_url": image_url}

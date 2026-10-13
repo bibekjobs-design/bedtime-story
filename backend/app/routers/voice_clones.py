@@ -76,7 +76,7 @@ async def upload_voice_clone(
     if not is_admin and tier not in ("premium", "premium_monthly", "premium_annual"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Voice cloning is a Super feature. Upgrade to the ₹219/month Super plan to clone your voice for bedtime stories!"
+            detail="Voice cloning is a Super feature. Upgrade to the ₹321/month Super plan to clone your voice on STORYLAND!"
         )
 
     if (consent or "").strip().lower() != "true":

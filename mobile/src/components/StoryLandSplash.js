@@ -3,17 +3,18 @@ import { View, Text, Animated, Easing, StyleSheet, Platform, useWindowDimensions
 import { Asset } from "expo-asset";
 import SafeAudio from "../utils/safeAudio";
 
-// Iron gate: S lands on the first clang, T O R Y on each following beat (170 ms apart).
+// Door-lock sound plays at the start while the letters grow in from the middle.
 const DOOR_SOUND = require("../../assets/sounds/door_lock.mp3");
 
 // Shown right after login, before the profile picker: the letters of
-// STORY LAND (red capitals): each letter comes running in from the left or right
-// side and joins the word, then the whole word fades into the dark background.
-const WORDS = ["STORY", "LAND"];
+// STORYLAND (one word, red capitals): the letters grow one by one from the middle (Y)
+// out to both ends, then the whole word fades into the dark background.
+const WORDS = ["STORYLAND"];
+const MID = 4; // index of the middle letter (Y)
 
 export default function StoryLandSplash({ onDone }) {
   const { width } = useWindowDimensions();
-  // One line "STORY LAND", sized to fit any phone width (56 max on wide screens).
+  // One line "STORYLAND", sized to fit any phone width (56 max on wide screens).
   const fontSize = Math.max(22, Math.min(56, Math.floor((width - 40) / 9.2)));
   const letters = [];
   WORDS.forEach((w, wi) => w.split("").forEach((ch, ci) => letters.push({ ch, wi, ci })));
@@ -26,8 +27,8 @@ export default function StoryLandSplash({ onDone }) {
     const slideIns = anims.map((a, i) =>
       Animated.timing(a, {
         toValue: 1,
-        duration: 220,
-        delay: 80 + i * 170,
+        duration: 380,
+        delay: 100 + Math.abs(i - MID) * 150,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: useNative,
       })
@@ -68,15 +69,11 @@ export default function StoryLandSplash({ onDone }) {
             {w.split("").map((ch, ci) => {
               k += 1;
               const a = anims[k];
-              const fromLeft = k % 2 === 0;
-              const tx = a.interpolate({
-                inputRange: [0, 1],
-                outputRange: [fromLeft ? -width : width, 0],
-              });
+              const scale = a.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
               return (
                 <Animated.Text
                   key={`${wi}-${ci}`}
-                  style={[styles.letter, { fontSize, letterSpacing: Math.max(1, fontSize * 0.06), opacity: a, transform: [{ translateX: tx }] }]}
+                  style={[styles.letter, { fontSize, letterSpacing: Math.max(1, fontSize * 0.06), opacity: a, transform: [{ scale }] }]}
                 >
                   {ch}
                 </Animated.Text>

@@ -530,7 +530,7 @@ export default function ProfilesScreen({
                 <View style={styles.upgradeBenefitRow}>
                   <Text style={styles.upgradeBenefitIcon}>🌙</Text>
                   <Text style={styles.upgradeBenefitText}>
-                    Full library access & offline playback for restful, screen-free bedtimes
+                    Full library access & offline playback for restful, screen-free evenings
                   </Text>
                 </View>
               </View>
@@ -636,8 +636,8 @@ export default function ProfilesScreen({
             <Text style={styles.emptyTitle}>No Cloned Voices Yet</Text>
             <Text style={styles.emptySubtitle}>
               {isPremium
-                ? "Clone your voice so bedtime stories can be narrated in Mom or Dad's comforting voice."
-                : "Clone your voice so bedtime stories can be narrated in Mom or Dad's comforting voice. This is a Super feature (₹321/month)."}
+                ? "Clone your voice so STORYLAND stories can be narrated in Mom or Dad's comforting voice."
+                : "Clone your voice so STORYLAND stories can be narrated in Mom or Dad's comforting voice. This is a Super feature (₹321/month)."}
             </Text>
             <TouchableOpacity
               style={styles.addFirstBtn}

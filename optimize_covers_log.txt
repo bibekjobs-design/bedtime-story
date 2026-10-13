@@ -1,0 +1,139 @@
+Stories with a cover picture: 67
+
+  [BIG]     1304 KB  The Lighthouse Secret
+        -> now 84 KB
+  [BIG]     1539 KB  The Stars in the Sky
+        -> now 104 KB
+  [BIG]     1473 KB  Little Ganesha: How He Got His Elephant Head
+        -> now 132 KB
+  [BIG]     1443 KB  Sindbad the Sailor
+        -> now 126 KB
+  [BIG]     1525 KB  The North Wind and the Sun
+        -> now 139 KB
+  [BIG]     1338 KB  The Elves and the Shoemaker
+        -> now 102 KB
+  [BIG]     1485 KB  The Blind Men and the Elephant
+        -> now 122 KB
+  [BIG]     1470 KB  Hanuman and the Sleepy Island
+        -> now 128 KB
+  [BIG]     1448 KB  Alibaba and the Forty Thieves
+        -> now 131 KB
+  [BIG]     1412 KB  The Sweetest Thing
+        -> now 92 KB
+  [BIG]     1559 KB  The Missing Moonstone
+        -> now 129 KB
+  [BIG]     1525 KB  The Fox and the Crow
+        -> now 142 KB
+  [BIG]     1675 KB  Tenali Rama and the Thieves
+        -> now 146 KB
+  [BIG]     1297 KB  Thumbelina
+        -> now 101 KB
+  [BIG]     1537 KB  The Khichdi
+        -> now 133 KB
+  [BIG]     1536 KB  The Monkey and the Crocodile
+        -> now 144 KB
+  [BIG]     1519 KB  Little Red Riding Hood
+        -> now 141 KB
+  [BIG]     1446 KB  Hanuman Crosses the Ocean
+        -> now 121 KB
+  [BIG]     1521 KB  The Midnight Baker
+        -> now 121 KB
+  [BIG]     1545 KB  Prahlad's Faith
+        -> now 96 KB
+  [BIG]     1227 KB  The Princess and the Pea
+        -> now 80 KB
+  [BIG]     1575 KB  The Blue Jackal
+        -> now 148 KB
+  [BIG]     1412 KB  The Secret Under the Old Bridge
+        -> now 110 KB
+  [BIG]     1480 KB  Little Hanuman and the Sun
+        -> now 116 KB
+  [BIG]     1451 KB  The Longest Line
+        -> now 122 KB
+  [BIG]     1413 KB  The Snow Queen
+        -> now 89 KB
+  [BIG]     1624 KB  The Little Match Girl
+        -> now 112 KB
+  [BIG]     1595 KB  How Many Crows?
+        -> now 141 KB
+  [BIG]     1539 KB  The Elephant and the Mouse
+        -> now 133 KB
+  [BIG]     1431 KB  The Clever Crow
+        -> now 131 KB
+  [BIG]     1640 KB  The Vanishing Acorns
+        -> now 137 KB
+  [BIG]     1449 KB  The Singing Stone
+        -> now 119 KB
+  [BIG]     1406 KB  The Hare and the Frog
+        -> now 118 KB
+  [BIG]     1553 KB  The Thief's Beard
+        -> now 134 KB
+  [BIG]     1333 KB  The Lost Lantern
+        -> now 101 KB
+  [BIG]     1421 KB  The Lion and the Rabbit
+        -> now 130 KB
+  [BIG]     1703 KB  The Greatest Fool
+        -> now 152 KB
+  [BIG]     1523 KB  The Best Flower
+        -> now 136 KB
+  [BIG]     1352 KB  The Four Friends
+        -> now 112 KB
+  [BIG]     1281 KB  Little Krishna: The Butter Pot
+        -> now 97 KB
+  [BIG]     1499 KB  Birbal Becomes Minister
+        -> now 130 KB
+  [BIG]     1449 KB  The Secret in the Snow
+        -> now 115 KB
+  [BIG]     1538 KB  Little Krishna: Mother's Love
+        -> now 134 KB
+  [BIG]     1416 KB  The Brahmin and the Mongoose
+        -> now 112 KB
+  [BIG]     1475 KB  How the Ganga Came to Earth
+        -> now 127 KB
+  [BIG]     1457 KB  Little Krishna: Kaliya Serpent
+        -> now 126 KB
+  [BIG]     1481 KB  The Tortoise and the Two Geese
+        -> now 125 KB
+  [BIG]     1332 KB  The Three Little Pigs
+        -> now 110 KB
+  [BIG]     1490 KB  Little Krishna: Uncle Kansa
+        -> now 131 KB
+  [BIG]     1689 KB  The Monkey King
+        -> now 153 KB
+  [BIG]     1499 KB  The Lion and the Mouse
+        -> now 126 KB
+  [BIG]     1521 KB  The Golden Deer
+        -> now 134 KB
+  [BIG]     1581 KB  Goldilocks and the Three Bears
+        -> now 146 KB
+  [BIG]     1412 KB  The Tortoise and the Hare
+        -> now 129 KB
+  [BIG]     1524 KB  The Fox and the Grapes
+        -> now 141 KB
+  [BIG]     1611 KB  Hansel and Gretel
+        -> now 150 KB
+  [BIG]     1345 KB  The Dog and His Reflection
+        -> now 111 KB
+  [BIG]     1439 KB  The Ant and the Grasshopper
+        -> now 125 KB
+  [BIG]     1438 KB  The Dove and the Ant
+        -> now 116 KB
+  [BIG]     1516 KB  The Boy Who Cried Wolf
+        -> now 145 KB
+  [BIG]     1474 KB  The Two Goats on the Bridge
+        -> now 129 KB
+  [BIG]     1515 KB  The Crow and the Pitcher
+        -> now 133 KB
+  [BIG]     1551 KB  The Wolf and the Crane
+        -> now 129 KB
+  [BIG]     1542 KB  The Goose That Laid the Golden Eggs
+        -> now 142 KB
+  [BIG]     1527 KB  The Ugly Duckling
+        -> now 132 KB
+  [BIG]     1446 KB  The Town Mouse and the Country Mouse
+        -> now 125 KB
+  [BIG]     1607 KB  The Little Mermaid
+        -> now 138 KB
+
+Total before: 97.1 MB
+Total after:  8.2 MB

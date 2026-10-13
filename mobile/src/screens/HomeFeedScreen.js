@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
   Modal,
+  Animated,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { api } from "../api/client";
@@ -192,6 +193,30 @@ function StoryCard({ story, width, height, onPress, busy, showNew, isAdmin, onEd
       ) : null}
     </TouchableOpacity>
   );
+}
+
+// Rotates the big featured story at the top every 5 seconds (soft fade).
+// Keeps its own timer/state so only this card re-renders, not the whole feed.
+const HERO_ROTATE_MS = 5000;
+function HeroRotator({ pool, children }) {
+  const [tick, setTick] = useState(0);
+  const fade = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    setTick(0);
+    if (!pool || pool.length < 2) return undefined;
+    const t = setInterval(() => setTick((n) => n + 1), HERO_ROTATE_MS);
+    return () => clearInterval(t);
+  }, [pool]);
+
+  useEffect(() => {
+    fade.setValue(0.25);
+    Animated.timing(fade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
+  }, [tick, fade]);
+
+  if (!pool || pool.length === 0) return null;
+  const hero = pool[tick % pool.length];
+  return <Animated.View style={{ opacity: fade }}>{children(hero)}</Animated.View>;
 }
 
 export default function HomeFeedScreen({
@@ -953,23 +978,23 @@ export default function HomeFeedScreen({
     }
   }
 
-  // Featured story at the top: a random one (prefers stories with a cover picture)
-  const hero = useMemo(() => {
+  // Featured stories at the top: a shuffled list (prefers stories with a cover picture)
+  // that rotates every 5 seconds. The shuffle is redone only when the feed changes.
+  const heroPool = useMemo(() => {
     const all = feedRows.flatMap((r) => r.stories.map((st) => ({ ...st, _cat: r.category.name })));
-    if (all.length === 0) return null;
-    const keep = heroRef.current && all.find((st) => st.id === heroRef.current);
-    if (keep) return keep;
+    if (all.length === 0) return [];
     const withCover = all.filter((st) => typeof st.cover_image_url === "string" && st.cover_image_url.startsWith("http"));
-    const pool = withCover.length > 0 ? withCover : all;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    heroRef.current = pick.id;
-    return pick;
+    const arr = [...(withCover.length > 0 ? withCover : all)];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
   }, [feedRows]);
 
-  // The featured story already has its big card, so it isn't repeated in its row
-  const visibleRows = feedRows
-    .map((r) => ({ ...r, stories: r.stories.filter((st) => !hero || st.id !== hero.id) }))
-    .filter((r) => r.stories.length > 0);
+  // The featured story keeps its normal place in its category row too, so the rows
+  // don't jump around while the top card rotates.
+  const visibleRows = feedRows.filter((r) => r.stories.length > 0);
 
   return (
     <View style={styles.container}>
@@ -1015,24 +1040,30 @@ export default function HomeFeedScreen({
           </View>
         )}
 
-        {!searchQuery && hero ? (
+        {!searchQuery && heroPool.length > 0 ? (
           <View style={styles.feedHeroWrap}>
-            <StoryCard
-              story={hero}
-              width="100%"
-              height={190}
-              busy={narratingId === hero.id}
-              showNew={isNewStory(hero)}
-              onPress={() => handleSelectStory(hero)}
-              locked={isLockedStory(hero)}
-              isAdmin={isAdmin}
-              onEdit={() => handleOpenEdit(hero)}
-              onDelete={() => handleDeleteStory(hero)}
-              deleting={deletingStoryId === hero.id}
-            />
-            <Text style={styles.feedHeroLabel} pointerEvents="none">
-              Tonight's pick · {hero._cat}
-            </Text>
+            <HeroRotator pool={heroPool}>
+              {(hero) => (
+                <View>
+                  <StoryCard
+                    story={hero}
+                    width="100%"
+                    height={190}
+                    busy={narratingId === hero.id}
+                    showNew={isNewStory(hero)}
+                    onPress={() => handleSelectStory(hero)}
+                    locked={isLockedStory(hero)}
+                    isAdmin={isAdmin}
+                    onEdit={() => handleOpenEdit(hero)}
+                    onDelete={() => handleDeleteStory(hero)}
+                    deleting={deletingStoryId === hero.id}
+                  />
+                  <Text style={styles.feedHeroLabel} pointerEvents="none">
+                    Tonight's pick · {hero._cat}
+                  </Text>
+                </View>
+              )}
+            </HeroRotator>
           </View>
         ) : null}
 

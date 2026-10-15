@@ -425,6 +425,7 @@ def get_admin_dashboard(current_user: dict = Depends(require_admin)):
         # Does NOT include egress/bandwidth - check that on Supabase's own
         # dashboard Usage page.
         "db_storage": _get_db_storage_stats(),
+        "keepalive": _get_keepalive_status(),
     }
 
 
@@ -455,6 +456,43 @@ def _parse_dt(value):
         return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except (ValueError, TypeError):
         return None
+
+
+def _get_keepalive_status() -> dict:
+    """Last time the backend pinged Supabase (keeps the free project from
+    being paused after 7 days of inactivity). Reads keepalive_log, which
+    survives restarts; falls back to the in-memory state."""
+    out = {"last_ping_at": None, "last_source": None, "pings_last_7_days": None,
+           "days_since_last_ping": None, "interval_hours": None, "error": None}
+    try:
+        import os
+        out["interval_hours"] = float(os.environ.get("KEEPALIVE_HOURS", "12"))
+    except Exception:
+        out["interval_hours"] = 12.0
+    try:
+        supabase = get_supabase()
+        last = (supabase.table("keepalive_log").select("pinged_at,source")
+                .order("pinged_at", desc=True).limit(1).execute())
+        if last.data:
+            out["last_ping_at"] = last.data[0].get("pinged_at")
+            out["last_source"] = last.data[0].get("source")
+        since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        cnt = (supabase.table("keepalive_log").select("id", count="exact")
+               .gte("pinged_at", since).execute())
+        out["pings_last_7_days"] = cnt.count
+    except Exception as e:
+        out["error"] = "keepalive_log not available - run backend/sql/010_keepalive.sql in Supabase SQL Editor."
+        try:
+            from app.main import KEEPALIVE_STATE
+            out["last_ping_at"] = KEEPALIVE_STATE.get("last_ok")
+        except Exception:
+            pass
+    dt = _parse_dt(out["last_ping_at"]) if out["last_ping_at"] else None
+    if dt:
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        out["days_since_last_ping"] = round((datetime.now(timezone.utc) - dt).total_seconds() / 86400, 2)
+    return out
 
 
 @router.get("/monthly-report")

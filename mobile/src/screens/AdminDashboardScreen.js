@@ -410,6 +410,39 @@ export default function AdminDashboardScreen({ onGoToHome }) {
               </View>
             )}
 
+            {data.keepalive && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>🟢 Supabase Keep-alive</Text>
+                {(() => {
+                  const k = data.keepalive;
+                  const fmt = (iso) => {
+                    if (!iso) return "—";
+                    const d = new Date(new Date(String(iso).replace(/\.(\d{3})\d+/, ".$1")).getTime() + 5.5 * 3600 * 1000);
+                    const p = (n) => String(n).padStart(2, "0");
+                    const mon = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getUTCMonth()];
+                    let h = d.getUTCHours(); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
+                    return `${p(d.getUTCDate())} ${mon} ${d.getUTCFullYear()}, ${h}:${p(d.getUTCMinutes())} ${ap} IST`;
+                  };
+                  const days = k.days_since_last_ping;
+                  const ok = days !== null && days !== undefined && days < 3;
+                  return (
+                    <>
+                      <Text style={{ color: ok ? "#4ade80" : "#ff8a8a", fontSize: 16, fontWeight: "700", marginBottom: 6 }}>
+                        {ok ? "Active - project will not pause" : "Check: no recent ping"}
+                      </Text>
+                      <Text style={styles.forecastNote}>Last Supabase ping: {fmt(k.last_ping_at)}</Text>
+                      <Text style={styles.forecastNote}>
+                        {days !== null && days !== undefined ? `${days} days ago` : "No ping recorded yet"}
+                        {k.pings_last_7_days !== null && k.pings_last_7_days !== undefined ? `  |  ${k.pings_last_7_days} pings in last 7 days` : ""}
+                      </Text>
+                      <Text style={styles.forecastNote}>Pings automatically every {k.interval_hours} hours. Supabase free projects pause after 7 days with no activity.</Text>
+                      {k.error ? <Text style={styles.forecastNote}>⚠️ {k.error}</Text> : null}
+                    </>
+                  );
+                })()}
+              </View>
+            )}
+
             {data.db_storage && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>💾 Database & Storage</Text>

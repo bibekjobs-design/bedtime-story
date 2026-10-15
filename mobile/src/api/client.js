@@ -159,6 +159,11 @@ export const api = {
       }&sort_by=${sortBy}${languageCode ? `&language_code=${languageCode}` : ""}`
     ),
 
+  // Share / rate the STORYLAND app itself
+  getAppLinks: () => request("/api/app/links"),
+  sendAppFeedback: (rating, comment) =>
+    request("/api/app/feedback", { method: "POST", body: JSON.stringify({ rating, comment: comment || null }) }),
+
   // Rate a story (1-5 stars)
   rateStory: (storyTextId, rating, deviceId = null) =>
     request(`/api/stories/${storyTextId}/rate`, {

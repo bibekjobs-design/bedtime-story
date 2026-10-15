@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.routers import lookups, stories, auth, profiles, voice_clones, subscriptions, admin, history, announcements, privacy, support
+from app.routers import lookups, stories, auth, profiles, voice_clones, subscriptions, admin, history, announcements, privacy, support, app_feedback
 app.include_router(lookups.router)
 app.include_router(stories.router)
 app.include_router(auth.router)
@@ -31,6 +31,7 @@ app.include_router(history.router)
 app.include_router(announcements.router)
 app.include_router(privacy.router)
 app.include_router(support.router)
+app.include_router(app_feedback.router)
 
 
 # Public legal pages (privacy policy, terms, delete-account) - needed as public

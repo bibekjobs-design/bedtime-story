@@ -16,6 +16,7 @@ import * as FileSystem from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { colors } from "../theme/colors";
 import { api } from "../api/client";
+import ShareRateApp from "../components/ShareRateApp";
 
 // Cover picture for the player: the story's own cover if it has one,
 // otherwise a coloured card with an emoji picked from the title.
@@ -670,6 +671,8 @@ export default function PlayerScreen({ story, onBack, onSwitchLanguage }) {
             <Text style={styles.ratingThankYou}>✨ Thank you for your feedback!</Text>
           ) : null}
         </View>
+
+        <ShareRateApp />
 
         {!isClonedStory && (
           <>

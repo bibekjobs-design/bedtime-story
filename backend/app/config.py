@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     MAIL_PORT: int = 587
     MAIL_STARTTLS: bool = True
     MAIL_SSL_TLS: bool = False
+    # Share / rate the app. After Google Play publishes the app, set PLAY_STORE_URL on Render.
+    PLAY_STORE_URL: str = ""
+    SHARE_URL: str = "https://bedtime-story-icmv.onrender.com"
+    SHARE_MESSAGE: str = ""
     FRONTEND_URL: str = "http://localhost:8081"  # Expo dev URL, update for prod
 
     model_config = SettingsConfigDict(

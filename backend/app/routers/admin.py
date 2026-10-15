@@ -426,6 +426,7 @@ def get_admin_dashboard(current_user: dict = Depends(require_admin)):
         # dashboard Usage page.
         "db_storage": _get_db_storage_stats(),
         "keepalive": _get_keepalive_status(),
+        "app_feedback": _get_app_feedback_summary(),
     }
 
 
@@ -492,6 +493,29 @@ def _get_keepalive_status() -> dict:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         out["days_since_last_ping"] = round((datetime.now(timezone.utc) - dt).total_seconds() / 86400, 2)
+    return out
+
+
+def _get_app_feedback_summary() -> dict:
+    """Ratings users gave to the STORYLAND app itself (Rate STORYLAND button)."""
+    out = {"count": 0, "average": None, "recent": [], "error": None}
+    try:
+        supabase = get_supabase()
+        rows = (supabase.table("app_feedback").select("rating,comment,created_at,user_id")
+                .order("created_at", desc=True).limit(500).execute().data or [])
+        out["count"] = len(rows)
+        if rows:
+            out["average"] = round(sum(r["rating"] for r in rows) / len(rows), 2)
+        recent = [r for r in rows if r.get("comment")][:8] or rows[:5]
+        ids = list({r["user_id"] for r in recent})
+        names = {}
+        if ids:
+            for u in supabase.table("users").select("id,full_name").in_("id", ids).execute().data or []:
+                names[u["id"]] = u.get("full_name") or "User"
+        out["recent"] = [{"rating": r["rating"], "comment": r.get("comment"), "created_at": r.get("created_at"),
+                          "name": names.get(r["user_id"], "User")} for r in recent]
+    except Exception:
+        out["error"] = "app_feedback table missing - run the app_feedback SQL in Supabase."
     return out
 
 

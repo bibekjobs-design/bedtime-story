@@ -410,6 +410,27 @@ export default function AdminDashboardScreen({ onGoToHome }) {
               </View>
             )}
 
+            {data.app_feedback && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>⭐ App Ratings (Rate STORYLAND)</Text>
+                {data.app_feedback.error ? (
+                  <Text style={styles.forecastNote}>⚠️ {data.app_feedback.error}</Text>
+                ) : (
+                  <>
+                    <Text style={{ color: "#ffd36b", fontSize: 22, fontWeight: "800", marginBottom: 4 }}>
+                      {data.app_feedback.average !== null && data.app_feedback.average !== undefined ? `${data.app_feedback.average} / 5` : "No ratings yet"}
+                    </Text>
+                    <Text style={styles.forecastNote}>{data.app_feedback.count} {data.app_feedback.count === 1 ? "rating" : "ratings"} from users</Text>
+                    {(data.app_feedback.recent || []).map((r, i) => (
+                      <Text key={i} style={styles.forecastNote}>
+                        {"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}  {r.name}{r.comment ? `: ${r.comment}` : ""}
+                      </Text>
+                    ))}
+                  </>
+                )}
+              </View>
+            )}
+
             {data.keepalive && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>🟢 Supabase Keep-alive</Text>

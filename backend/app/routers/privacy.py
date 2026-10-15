@@ -70,7 +70,7 @@ def delete_account(payload: DeleteAccountRequest, current_user: dict = Depends(g
 
     # 4. Everything else that hangs off the user (children before profiles).
     for table in ("story_events", "personalized_stories", "child_profiles",
-                  "email_verification_tokens", "password_reset_tokens"):
+                  "email_verification_tokens", "password_reset_tokens", "app_feedback"):
         _safe(table, lambda t=table: supabase.table(t).delete().eq("user_id", uid).execute())
 
     # 5. The account itself. Payments may still point at it: then scrub it.

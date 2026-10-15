@@ -483,35 +483,14 @@ def delete_clone_everywhere(supabase, clone: dict) -> None:
             supabase.storage.from_("story-audio").remove([f"{folder}/{n}" for n in names])
     except Exception as e:
         print(f"[voice clone] sample cleanup failed: {e}")
-    # Stories narrated with this voice reference it (foreign key), so remove them
-    # first - their audio file, History entry and saved row. A parent can delete
-    # their cloned voice at any time.
-    try:
-        rows = supabase.table("personalized_stories").select("id,audio_url").eq("voice_clone_id", clone["id"]).execute().data or []
-    except Exception as e:
-        print(f"[voice clone] could not list stories of voice: {e}")
-        rows = []
-    for r in rows:
-        url = r.get("audio_url") or ""
-        if "/story-audio/" in url:
-            path = url.split("/story-audio/", 1)[1].split("?", 1)[0]
-            try:
-                supabase.storage.from_("story-audio").remove([path])
-            except Exception as e:
-                print(f"[voice clone] story audio cleanup failed: {e}")
-        if url:
-            try:
-                supabase.table("story_events").delete().eq("audio_url", url).execute()
-            except Exception:
-                pass
-    try:
-        supabase.table("personalized_stories").delete().eq("voice_clone_id", clone["id"]).execute()
-    except Exception as e:
-        print(f"[voice clone] story delete failed, detaching instead: {e}")
+    # Stories narrated with this voice keep working after it is deleted: only the
+    # link to the voice is cleared (the story, its audio and its History entry
+    # stay). The parent can remove any story permanently from History.
+    for table in ("personalized_stories", "story_events"):
         try:
-            supabase.table("personalized_stories").update({"voice_clone_id": None}).eq("voice_clone_id", clone["id"]).execute()
-        except Exception as e2:
-            print(f"[voice clone] detach failed: {e2}")
+            supabase.table(table).update({"voice_clone_id": None}).eq("voice_clone_id", clone["id"]).execute()
+        except Exception as e:
+            print(f"[voice clone] could not detach {table} from voice: {e}")
     supabase.table("voice_clones").delete().eq("id", clone["id"]).execute()
 
 

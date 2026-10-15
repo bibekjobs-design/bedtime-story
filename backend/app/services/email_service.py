@@ -21,8 +21,10 @@ from app.config import settings
 
 SUPPORT_EMAIL = "storylandconnect@gmail.com"
 BRAND = "STORYLAND"
-ACCENT = "#e50914"  # the red of the app's "S" logo
+ACCENT = "#f6c453"  # gold of the STORYLAND logo
+LINK = "#6b3fd4"    # readable purple for links on white
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "email_logo.png")
+WORDMARK_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "email_wordmark.png")
 
 
 def _send_email(to_addr: str, subject: str, body: str, html: Optional[str] = None,
@@ -39,19 +41,22 @@ def _send_email(to_addr: str, subject: str, body: str, html: Optional[str] = Non
         alt = MIMEMultipart("alternative")
         alt.attach(MIMEText(body, "plain", "utf-8"))
         alt.attach(MIMEText(html, "html", "utf-8"))
-        logo = None
-        if "cid:storyland_logo" in html:
-            try:
-                with open(LOGO_PATH, "rb") as fh:
-                    logo = MIMEImage(fh.read(), _subtype="png")
-                logo.add_header("Content-ID", "<storyland_logo>")
-                logo.add_header("Content-Disposition", "inline", filename="storyland.png")
-            except Exception as e:
-                print(f"[email_service] logo not attached: {e}")
-        if logo is not None:
+        images = []
+        for cid, path in (("storyland_logo", LOGO_PATH), ("storyland_wordmark", WORDMARK_PATH)):
+            if f"cid:{cid}" in html:
+                try:
+                    with open(path, "rb") as fh:
+                        img = MIMEImage(fh.read(), _subtype="png")
+                    img.add_header("Content-ID", f"<{cid}>")
+                    img.add_header("Content-Disposition", "inline", filename=f"{cid}.png")
+                    images.append(img)
+                except Exception as e:
+                    print(f"[email_service] {cid} not attached: {e}")
+        if images:
             msg = MIMEMultipart("related")
             msg.attach(alt)
-            msg.attach(logo)
+            for img in images:
+                msg.attach(img)
         else:
             msg = alt
     else:
@@ -93,21 +98,21 @@ def _wrap(title: str, inner_html: str) -> str:
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ec;padding:24px 0;">
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#222;">
-<tr><td style="background:#101119;padding:16px 28px;">
+<tr><td style="background:#0b0b24;padding:16px 28px;">
 <table cellpadding="0" cellspacing="0"><tr>
 <td style="padding-right:14px;"><img src="cid:storyland_logo" width="52" height="52" alt="S" style="display:block;border-radius:12px;border:0;"></td>
-<td style="color:#e50914;font-size:24px;font-weight:700;letter-spacing:3px;font-family:Georgia,'Times New Roman',serif;">{BRAND}</td>
+<td><img src="cid:storyland_wordmark" width="190" height="32" alt="{BRAND}" style="display:block;border:0;"></td>
 </tr></table></td></tr>
 <tr><td style="height:4px;background:{ACCENT};line-height:4px;font-size:0;">&nbsp;</td></tr>
 <tr><td style="padding:28px;">
 <h2 style="margin:0 0 14px 0;font-size:20px;color:#101119;">{escape(title)}</h2>
 {inner_html}
-<p style="margin:26px 0 0 0;font-size:13px;color:#777;">Questions? Write to us at <a href="mailto:{SUPPORT_EMAIL}" style="color:{ACCENT};">{SUPPORT_EMAIL}</a>.<br>Sweet dreams from the {BRAND} team.</p>
+<p style="margin:26px 0 0 0;font-size:13px;color:#777;">Questions? Write to us at <a href="mailto:{SUPPORT_EMAIL}" style="color:{LINK};">{SUPPORT_EMAIL}</a>.<br>Sweet dreams from the {BRAND} team.</p>
 </td></tr></table></td></tr></table></body></html>"""
 
 
 def _button(url: str, label: str) -> str:
-    return (f'<p style="margin:20px 0;"><a href="{escape(url)}" style="background:{ACCENT};color:#ffffff;'
+    return (f'<p style="margin:20px 0;"><a href="{escape(url)}" style="background:{ACCENT};color:#1a1033;'
             f'text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;display:inline-block;">'
             f'{escape(label)}</a></p>')
 

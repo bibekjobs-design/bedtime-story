@@ -3,15 +3,23 @@ import { View, Text, Image, Animated, Easing, StyleSheet, Platform, useWindowDim
 import { Asset } from "expo-asset";
 import SafeAudio from "../utils/safeAudio";
 
-// Door-lock sound plays at the start while the letters grow in from the middle.
+// Door-lock sound plays in sync with the first letter, while the letters grow in from the middle.
 const LOGO = require("../../assets/logo_badge.png");
 const DOOR_SOUND = require("../../assets/sounds/door_lock.mp3");
 
 // Shown right after login, before the profile picker: the letters of
-// STORYLAND (one word, red capitals): the letters grow one by one from the middle (Y)
+// STORYLAND (one word, gold-to-purple capitals): the letters grow one by one from the middle (Y)
 // out to both ends, then the whole word fades into the dark background.
 const WORDS = ["STORYLAND"];
 const MID = 4; // index of the middle letter (Y)
+// Gold -> lavender -> purple gradient across the letters (matches the logo).
+const STOPS = [[246, 196, 83], [233, 168, 255], [165, 107, 255]];
+function letterColor(i, n) {
+  const t = n <= 1 ? 0 : i / (n - 1);
+  const [a, b, f] = t < 0.5 ? [STOPS[0], STOPS[1], t / 0.5] : [STOPS[1], STOPS[2], (t - 0.5) / 0.5];
+  const c = a.map((v, j) => Math.round(v + (b[j] - v) * f));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
 
 export default function StoryLandSplash({ onDone }) {
   const { width } = useWindowDimensions();
@@ -52,7 +60,7 @@ export default function StoryLandSplash({ onDone }) {
         if (cancelled) res.sound.unloadAsync();
         else sound = res.sound;
       } catch (e) {}
-    }, 0);
+    }, 900); // sound starts exactly when the first letter (Y) appears
     run.start(({ finished }) => {
       if (finished && onDone) onDone();
     });
@@ -72,7 +80,7 @@ export default function StoryLandSplash({ onDone }) {
         <Animated.Image
           source={LOGO}
           style={{
-            width: 110, height: 110, borderRadius: 24, marginBottom: 28,
+            width: 150, height: 150, borderRadius: 32, marginBottom: 30,
             opacity: logoAnim,
             transform: [{ scale: logoAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }],
           }}
@@ -87,7 +95,7 @@ export default function StoryLandSplash({ onDone }) {
               return (
                 <Animated.Text
                   key={`${wi}-${ci}`}
-                  style={[styles.letter, { fontSize, letterSpacing: Math.max(1, fontSize * 0.06), opacity: a, transform: [{ scale }] }]}
+                  style={[styles.letter, { fontSize, letterSpacing: Math.max(1, fontSize * 0.06), opacity: a, color: letterColor(k, 9), transform: [{ scale }] }]}
                 >
                   {ch}
                 </Animated.Text>
@@ -111,7 +119,10 @@ const styles = StyleSheet.create({
   wordsWrap: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
   wordRow: { flexDirection: "row" },
   letter: {
-    color: "#e50914",
+    color: "#f6c453",
+    textShadowColor: "rgba(165,107,255,0.55)",
+    textShadowRadius: 14,
+    textShadowOffset: { width: 0, height: 0 },
     fontSize: 56,
     fontWeight: "900",
     letterSpacing: 4,
